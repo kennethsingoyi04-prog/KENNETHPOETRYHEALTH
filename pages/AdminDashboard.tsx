@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { AppState, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { 
@@ -20,7 +21,8 @@ import {
   PieChart as PieIcon,
   MessageSquare,
   Save,
-  Check
+  Check,
+  Activity
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -124,10 +126,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       return acc;
     }, {} as Record<string, number>);
 
+    const total = state.withdrawals.length || 1;
+
     return [
-      { name: 'Pending', value: counts[WithdrawalStatus.PENDING] || 0, color: '#f59e0b' },
-      { name: 'Approved', value: counts[WithdrawalStatus.APPROVED] || 0, color: '#118131' },
-      { name: 'Rejected', value: counts[WithdrawalStatus.REJECTED] || 0, color: '#D21034' },
+      { 
+        name: 'Pending', 
+        value: counts[WithdrawalStatus.PENDING] || 0, 
+        color: '#f59e0b',
+        percentage: (((counts[WithdrawalStatus.PENDING] || 0) / total) * 100).toFixed(1)
+      },
+      { 
+        name: 'Approved', 
+        value: counts[WithdrawalStatus.APPROVED] || 0, 
+        color: '#118131',
+        percentage: (((counts[WithdrawalStatus.APPROVED] || 0) / total) * 100).toFixed(1)
+      },
+      { 
+        name: 'Rejected', 
+        value: counts[WithdrawalStatus.REJECTED] || 0, 
+        color: '#D21034',
+        percentage: (((counts[WithdrawalStatus.REJECTED] || 0) / total) * 100).toFixed(1)
+      },
     ];
   }, [state.withdrawals]);
 
@@ -139,7 +158,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
     const total = state.withdrawals.length || 1;
 
-    // Explicitly cast to [string, number][] to avoid inference issues with arithmetic operations on 'value'
     return (Object.entries(counts) as [string, number][]).map(([name, value]) => ({
       name,
       value,
@@ -329,7 +347,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><PieChartIcon size={18} className="text-malawi-red" /> Health Check</h3>
-            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Withdrawal status</span>
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Quick Status Summary</span>
           </div>
           <div className="h-[250px] w-full flex items-center justify-center relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -363,6 +381,82 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                 <span className="text-sm font-bold">{d.value}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* NEW SECTION: Withdrawal Status Lifecycle Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
+              <Activity size={18} className="text-malawi-green" /> Status Lifecycle Analysis
+            </h3>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">Overall Processing</span>
+          </div>
+          <div className="h-[280px] w-full flex items-center justify-center relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={withdrawalStatusData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={100}
+                  innerRadius={50}
+                  paddingAngle={5}
+                  dataKey="value"
+                  animationDuration={1500}
+                >
+                  {withdrawalStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={2} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value: number, name: string, props: any) => [
+                    `${value} requests (${props.payload.percentage}%)`, 
+                    name
+                  ]}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                />
+                <Legend verticalAlign="bottom" height={36}/>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><LayoutGrid size={18} className="text-gray-700" /> Resolution Insights</h3>
+          </div>
+          <div className="space-y-6 flex flex-col justify-center h-full">
+            <div className="space-y-4">
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Detailed Status Breakdown</p>
+              {withdrawalStatusData.map(status => (
+                <div key={status.name} className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase">
+                    <span>{status.name}</span>
+                    <span>{status.value} Requests ({status.percentage}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
+                    <div 
+                      className="h-full rounded-full transition-all duration-700 ease-in-out" 
+                      style={{ 
+                        backgroundColor: status.color, 
+                        width: `${status.percentage}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-center border border-dashed border-gray-200 mt-4">
+              <h4 className="text-[10px] font-black text-gray-700 uppercase mb-2">Efficiency Metric</h4>
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Aim to maintain 'Pending' status below 10% for optimal affiliate satisfaction. High 'Rejected' rates may indicate poor onboarding instructions or invalid account data entry by users.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -593,7 +687,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       </section>
 
-      {/* NEW SECTION: Withdrawal Notes Management */}
+      {/* Withdrawal Notes Management */}
       <section className="bg-white rounded-2 shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter flex items-center gap-2">
