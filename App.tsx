@@ -9,7 +9,7 @@ import History from './pages/History';
 import Navbar from './components/Navbar';
 import { User, AppState, UserRole } from './types';
 
-const STORAGE_KEY = 'kwacha_affiliate_state';
+const STORAGE_KEY = 'kennethpoetryhealth_state';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
@@ -23,7 +23,7 @@ const App: React.FC = () => {
         {
           id: 'admin-1',
           fullName: 'System Administrator',
-          email: 'admin@kwacha.mw',
+          email: 'admin@kennethpoetryhealth.mw',
           phone: '+265888123456',
           whatsapp: '+265888123456',
           referralCode: 'ADMIN001',

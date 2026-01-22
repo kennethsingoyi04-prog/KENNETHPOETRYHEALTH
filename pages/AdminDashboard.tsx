@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppState, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { 
   Users, 
@@ -11,7 +11,9 @@ import {
   Search,
   TrendingUp,
   PieChart as PieChartIcon,
-  Calendar
+  Calendar,
+  X,
+  Maximize2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -37,6 +39,8 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate }) => {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
   const totalUsers = state.users.length;
   const totalBalance = state.users.reduce((acc, u) => acc + u.balance, 0);
   const pendingWithdrawals = state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING);
@@ -46,7 +50,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
   // --- Data Calculations for Charts ---
 
-  // 1. User Growth Over Time (Cumulative)
   const userGrowthData = useMemo(() => {
     const sortedUsers = [...state.users].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     const growthMap = new Map<string, number>();
@@ -61,7 +64,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     return Array.from(growthMap.entries()).map(([date, count]) => ({ date, count }));
   }, [state.users]);
 
-  // 2. Daily Earnings (from Referrals)
   const dailyEarningsData = useMemo(() => {
     const earningsMap = new Map<string, number>();
     state.referrals.forEach(ref => {
@@ -69,12 +71,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       earningsMap.set(date, (earningsMap.get(date) || 0) + ref.commission);
     });
 
-    // Fill in last 7 days if empty for better visuals
     const data = Array.from(earningsMap.entries()).map(([date, amount]) => ({ date, amount }));
     return data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [state.referrals]);
 
-  // 3. Withdrawal Status Breakdown
   const withdrawalStatusData = useMemo(() => {
     const counts = state.withdrawals.reduce((acc, w) => {
       acc[w.status] = (acc[w.status] || 0) + 1;
@@ -88,7 +88,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     ];
   }, [state.withdrawals]);
 
-  // 4. Payout Method Breakdown
   const methodData = useMemo(() => {
     const counts = state.withdrawals.reduce((acc, w) => {
       acc[w.paymentMethod] = (acc[w.paymentMethod] || 0) + 1;
@@ -127,10 +126,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Proof Preview Modal (Still available for quick view) */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="absolute top-6 right-6 flex gap-4">
+            <a 
+              href={previewImage} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-white bg-malawi-green hover:bg-green-700 px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-bold text-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink size={18} /> Open in New Tab
+            </a>
+            <button 
+              className="text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
+              onClick={() => setPreviewImage(null)}
+            >
+              <X size={28} />
+            </button>
+          </div>
+          <div className="relative max-w-4xl w-full max-h-full flex items-center justify-center" onClick={e => e.stopPropagation()}>
+            <img 
+              src={previewImage} 
+              alt="Proof Preview" 
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/10 shadow-white/5"
+            />
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-malawi-black">Admin Panel</h1>
-          <p className="text-gray-500">Real-time system health & financial analytics</p>
+          <h1 className="text-2xl font-black text-malawi-black tracking-tight uppercase">Admin Control Center</h1>
+          <p className="text-gray-500">Managing <span className="text-malawi-red font-bold">KENNETHPOETRYHEALTH</span> Financials</p>
         </div>
         <div className="flex gap-2">
           <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
@@ -174,11 +206,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
       {/* Primary Analytics Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* User Growth Area Chart */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} className="text-blue-500" /> User Growth</h3>
-            <span className="text-xs text-gray-400 font-medium">LIFETIME</span>
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><TrendingUp size={18} className="text-blue-500" /> Growth Trajectory</h3>
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">User Registrations</span>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -201,11 +232,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           </div>
         </div>
 
-        {/* Withdrawal Status Pie Chart */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2"><PieChartIcon size={18} className="text-malawi-red" /> Request Status</h3>
-            <span className="text-xs text-gray-400 font-medium">OVERALL</span>
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><PieChartIcon size={18} className="text-malawi-red" /> Health Check</h3>
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Withdrawal status</span>
           </div>
           <div className="h-[250px] w-full flex items-center justify-center relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -225,7 +255,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute flex flex-col items-center">
-              <span className="text-xs text-gray-400 font-bold uppercase">Total</span>
+              <span className="text-xs text-gray-400 font-bold uppercase tracking-tighter">Total Requests</span>
               <span className="text-xl font-black">{state.withdrawals.length}</span>
             </div>
           </div>
@@ -242,11 +272,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           </div>
         </div>
 
-        {/* Daily Earnings Bar Chart */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2"><Calendar size={18} className="text-malawi-green" /> Daily Commissions</h3>
-            <span className="text-xs text-gray-400 font-medium">ACTIVITY TREND</span>
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><Calendar size={18} className="text-malawi-green" /> Earning Velocity</h3>
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Daily Sums</span>
           </div>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -265,10 +294,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           </div>
         </div>
 
-        {/* Payout Methods Card */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2"><Wallet size={18} className="text-gray-700" /> Payout Channels</h3>
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><Wallet size={18} className="text-gray-700" /> Channel Usage</h3>
           </div>
           <div className="space-y-4">
             {methodData.length > 0 ? methodData.map(method => (
@@ -277,9 +305,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                   <span>{method.name}</span>
                   <span>{method.value} Requests</span>
                 </div>
-                <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+                <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
                   <div 
-                    className="h-full rounded-full transition-all duration-1000" 
+                    className="h-full rounded-full transition-all duration-500" 
                     style={{ 
                       backgroundColor: method.color, 
                       width: `${(method.value / (state.withdrawals.length || 1)) * 100}%` 
@@ -297,8 +325,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       {/* Approval Table */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h3 className="font-bold text-lg">Queue: Pending Withdrawals</h3>
-          <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">
+          <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter">Withdrawal Queue</h3>
+          <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold uppercase tracking-tighter border border-yellow-200">
             {pendingWithdrawals.length} Action Needed
           </span>
         </div>
@@ -306,23 +334,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           {pendingWithdrawals.length === 0 ? (
             <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-2">
               <CheckCircle className="text-malawi-green" size={32} />
-              <p>Great work! All withdrawal requests have been processed.</p>
+              <p className="font-medium text-gray-600">Queue Cleared! All requests processed.</p>
             </div>
           ) : (
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-[10px]">
                 <tr>
-                  <th className="px-6 py-4">User Details</th>
-                  <th className="px-6 py-4">Amount</th>
-                  <th className="px-6 py-4">Payment Contacts</th>
+                  <th className="px-6 py-4">Beneficiary</th>
+                  <th className="px-6 py-4">Net Amount</th>
+                  <th className="px-6 py-4">Payment Info</th>
                   <th className="px-6 py-4">Method</th>
-                  <th className="px-6 py-4">Proof</th>
-                  <th className="px-6 py-4 text-center">Action</th>
+                  <th className="px-6 py-4">Verification</th>
+                  <th className="px-6 py-4 text-center">Decision</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pendingWithdrawals.map((w) => (
-                  <tr key={w.id} className="hover:bg-gray-50/50">
+                  <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <p className="font-bold text-gray-900">{w.userName}</p>
                       <p className="text-[10px] text-gray-400">ID: {w.userId}</p>
@@ -333,31 +361,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                       <p className="text-xs text-green-600 font-bold">WA: {w.whatsapp}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                        w.paymentMethod === 'Airtel Money' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
+                        w.paymentMethod === 'Airtel Money' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
                       }`}>
                         {w.paymentMethod}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       {w.proofUrl ? (
-                        <a href={w.proofUrl} target="_blank" className="text-blue-500 hover:text-blue-700 flex items-center gap-1 text-xs font-bold underline">
-                          <ExternalLink size={12} /> View Proof
-                        </a>
-                      ) : <span className="text-gray-300 text-xs italic">No screenshot</span>}
+                        <div className="flex gap-2 items-center">
+                          <a 
+                            href={w.proofUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 text-xs font-bold underline transition-colors group"
+                          >
+                            <ExternalLink size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" /> 
+                            View Proof
+                          </a>
+                          <button 
+                            onClick={() => setPreviewImage(w.proofUrl!)}
+                            className="text-gray-400 hover:text-gray-600"
+                            title="Quick Preview"
+                          >
+                            <Maximize2 size={12} />
+                          </button>
+                        </div>
+                      ) : <span className="text-gray-400 text-xs italic font-medium">No Proof</span>}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2 justify-center">
                         <button 
                           onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.APPROVED)}
-                          className="bg-malawi-green text-white p-2 rounded-lg hover:shadow-lg hover:scale-110 transition-all"
+                          className="bg-malawi-green text-white p-2 rounded-lg hover:shadow-lg hover:scale-110 active:scale-95 transition-all"
                           title="Approve & Notify User"
                         >
                           <CheckCircle size={18} />
                         </button>
                         <button 
                           onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.REJECTED)}
-                          className="bg-malawi-red text-white p-2 rounded-lg hover:shadow-lg hover:scale-110 transition-all"
+                          className="bg-malawi-red text-white p-2 rounded-lg hover:shadow-lg hover:scale-110 active:scale-95 transition-all"
                           title="Reject & Refund Balance"
                         >
                           <XCircle size={18} />
@@ -375,26 +418,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       {/* User Management List */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
-          <h3 className="font-bold text-lg">User Directory</h3>
-          <p className="text-xs text-gray-400">{state.users.length} registered accounts</p>
+          <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter">Affiliate Directory</h3>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">{state.users.length} Active Accounts</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-[10px]">
               <tr>
-                <th className="px-6 py-4">Affiliate Name</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Wallet Balance</th>
-                <th className="px-6 py-4">Total Earnings</th>
-                <th className="px-6 py-4">Join Date</th>
+                <th className="px-6 py-4">Name & Code</th>
+                <th className="px-6 py-4">Access Level</th>
+                <th className="px-6 py-4">Current Wallet</th>
+                <th className="px-6 py-4">Lifetime Yield</th>
+                <th className="px-6 py-4">Onboarding</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {state.users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50/50">
+                <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-900">{u.fullName}</p>
-                    <p className="text-[10px] text-gray-400 font-mono uppercase">{u.referralCode}</p>
+                    <p className="text-[10px] text-gray-400 font-mono uppercase font-semibold">{u.referralCode}</p>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-tighter ${
@@ -404,8 +447,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                     </span>
                   </td>
                   <td className="px-6 py-4 font-bold text-malawi-green">MWK {u.balance.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-gray-600">MWK {u.totalEarnings.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-gray-400 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-gray-600 font-medium">MWK {u.totalEarnings.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-gray-400 text-xs font-medium">{new Date(u.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
