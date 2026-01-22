@@ -1,0 +1,7 @@
+{
+  "name": "KENNETHPOETRYHEALTH",
+  "description": "A fully functional, customizable affiliate marketing system tailored for Malawi. Features multi-level earnings (MWK), Airtel Money/TNM Mpamba withdrawals, and an admin dashboard with PDF receipt generation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
