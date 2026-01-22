@@ -8,10 +8,11 @@ import ProofPreview from './pages/ProofPreview';
 import Withdraw from './pages/Withdraw';
 import History from './pages/History';
 import Profile from './pages/Profile';
+import Complaints from './pages/Complaints';
 import Navbar from './components/Navbar';
 import { User, AppState, UserRole } from './types';
 
-const STORAGE_KEY = 'kennethpoetryhealth_state';
+const STORAGE_KEY = 'kennethpoetryhealth_state_v2'; // Bumped version for new schema
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
@@ -24,6 +25,7 @@ const App: React.FC = () => {
       users: [
         {
           id: 'admin-1',
+          username: 'admin',
           fullName: 'System Administrator',
           email: 'admin@kennethpoetryhealth.mw',
           phone: '+265888123456',
@@ -33,11 +35,20 @@ const App: React.FC = () => {
           balance: 0,
           totalEarnings: 0,
           createdAt: new Date().toISOString(),
-          password: 'password123'
+          password: 'password123',
+          membershipTier: 'GOLD',
+          membershipStatus: 'ACTIVE',
+          notificationPrefs: {
+            emailWithdrawal: true,
+            emailReferral: true,
+            whatsappWithdrawal: true,
+            whatsappReferral: true
+          }
         }
       ],
       withdrawals: [],
-      referrals: []
+      referrals: [],
+      complaints: []
     };
   });
 
@@ -45,8 +56,11 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  const login = (email: string, password?: string) => {
-    const user = state.users.find(u => u.email === email && (!u.password || u.password === password));
+  const login = (identifier: string, password?: string) => {
+    const user = state.users.find(u => 
+      (u.email === identifier || u.username === identifier) && 
+      (!u.password || u.password === password)
+    );
     if (user) {
       setState(prev => ({ ...prev, currentUser: user }));
       return true;
@@ -65,7 +79,7 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
-        <Navbar currentUser={state.currentUser} onLogout={logout} />
+        <Navbar currentUser={state.currentUser} onLogout={logout} complaintsCount={state.complaints.filter(c => c.status === 'PENDING').length} />
         <main className="container mx-auto px-4 py-6">
           <Routes>
             <Route path="/auth" element={
@@ -86,6 +100,10 @@ const App: React.FC = () => {
 
             <Route path="/profile" element={
               state.currentUser ? <Profile state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
+            } />
+
+            <Route path="/complaints" element={
+              state.currentUser ? <Complaints state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
             } />
 
             <Route path="/admin" element={

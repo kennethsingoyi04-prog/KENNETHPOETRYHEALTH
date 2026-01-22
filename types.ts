@@ -7,19 +7,43 @@ export enum WithdrawalStatus {
   REJECTED = 'REJECTED'
 }
 
+export enum MembershipStatus {
+  INACTIVE = 'INACTIVE',
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE'
+}
+
+export enum MembershipTier {
+  NONE = 'NONE',
+  BRONZE = 'BRONZE',
+  PLATINUM = 'PLATINUM',
+  SILVER = 'SILVER',
+  COPPER = 'COPPER',
+  ALUMINIUM = 'ALUMINIUM',
+  GOLD = 'GOLD'
+}
+
 export enum PaymentMethod {
   AIRTEL_MONEY = 'Airtel Money',
   TNM_MPAMBA = 'TNM Mpamba'
 }
 
+export interface NotificationPreferences {
+  emailWithdrawal: boolean;
+  emailReferral: boolean;
+  whatsappWithdrawal: boolean;
+  whatsappReferral: boolean;
+}
+
 export interface User {
   id: string;
+  username: string;
   fullName: string;
   email: string;
   phone: string;
   whatsapp: string;
   referralCode: string;
-  referredBy?: string; // ID of the person who referred this user
+  referredBy?: string;
   role: UserRole;
   balance: number;
   totalEarnings: number;
@@ -27,7 +51,12 @@ export interface User {
   password?: string;
   profilePic?: string;
   bio?: string;
-  location?: string; // Added for extra user details
+  location?: string;
+  notificationPrefs?: NotificationPreferences;
+  // Membership Fields
+  membershipTier: MembershipTier;
+  membershipStatus: MembershipStatus;
+  membershipProofUrl?: string;
 }
 
 export interface WithdrawalRequest {
@@ -53,9 +82,22 @@ export interface Referral {
   timestamp: string;
 }
 
+export interface Complaint {
+  id: string;
+  userId: string;
+  userName: string;
+  subject: string;
+  message: string;
+  reply?: string;
+  status: 'PENDING' | 'RESOLVED';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppState {
   currentUser: User | null;
   users: User[];
   withdrawals: WithdrawalRequest[];
   referrals: Referral[];
+  complaints: Complaint[];
 }
