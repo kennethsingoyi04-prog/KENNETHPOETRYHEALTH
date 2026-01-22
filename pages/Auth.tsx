@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppState, User, Referral } from '../types';
 import { LEVEL_1_COMMISSION_PERCENT, LEVEL_2_COMMISSION_PERCENT, SIGNUP_BONUS } from '../constants';
@@ -8,7 +8,7 @@ import { notifyNewRegistration } from '../services/NotificationService';
 
 interface AuthProps {
   state: AppState;
-  onLogin: (email: string) => boolean;
+  onLogin: (email: string, password?: string) => boolean;
   onStateUpdate: (s: Partial<AppState>) => void;
 }
 
@@ -20,6 +20,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     email: '',
     phone: '',
     whatsapp: '',
+    password: '',
     referralCode: searchParams.get('ref') || '',
   });
 
@@ -27,8 +28,8 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     e.preventDefault();
     
     if (isLogin) {
-      const success = onLogin(formData.email);
-      if (!success) alert('User not found. Try registering!');
+      const success = onLogin(formData.email, formData.password);
+      if (!success) alert('Invalid credentials. Check your email and password!');
     } else {
       // Register New User
       const userId = `u-${Date.now()}`;
@@ -42,6 +43,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         email: formData.email,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
+        password: formData.password,
         referralCode: newUserReferralCode,
         referredBy: referrer?.id,
         role: 'USER',
@@ -56,7 +58,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
       // Handle Commissions
       if (referrer) {
         // Level 1 Commission (Direct)
-        const l1Commission = (SIGNUP_BONUS * LEVEL_1_COMMISSION_PERCENT) / 100; // Simulated commission on "activation" or signup
+        const l1Commission = (SIGNUP_BONUS * LEVEL_1_COMMISSION_PERCENT) / 100;
         const l1Referral: Referral = {
           id: `r-${Date.now()}-1`,
           referrerId: referrer.id,
@@ -129,11 +131,11 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           <p className="text-sm font-bold text-malawi-red uppercase tracking-wider mb-2">Platform Stats</p>
           <div className="flex justify-between items-end">
             <div>
-              <p className="text-3xl font-bold">12</p>
+              <p className="text-3xl font-bold">{state.users.length}</p>
               <p className="text-xs text-gray-400">Active Affiliates</p>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-malawi-green">1</p>
+              <p className="text-3xl font-bold text-malawi-green">{Math.floor(state.withdrawals.filter(w => w.status === 'APPROVED').reduce((acc, w) => acc + w.amount, 0) / 1000)}K</p>
               <p className="text-xs text-gray-400">MWK Paid Out</p>
             </div>
           </div>
@@ -212,18 +214,17 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
               </>
             )}
 
-            {isLogin && (
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="password" required placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-malawi-green"
-                  />
-                </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="password" required placeholder="••••••••"
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-malawi-green"
+                  onChange={e => setFormData({...formData, password: e.target.value})}
+                />
               </div>
-            )}
+            </div>
 
             <button className="w-full bg-malawi-black hover:bg-gray-800 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all">
               {isLogin ? 'Sign In' : 'Create Free Account'}

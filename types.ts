@@ -24,6 +24,10 @@ export interface User {
   balance: number;
   totalEarnings: number;
   createdAt: string;
+  password?: string;
+  profilePic?: string;
+  bio?: string;
+  location?: string; // Added for extra user details
 }
 
 export interface WithdrawalRequest {

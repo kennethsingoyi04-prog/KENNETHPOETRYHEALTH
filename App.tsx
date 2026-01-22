@@ -7,6 +7,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ProofPreview from './pages/ProofPreview';
 import Withdraw from './pages/Withdraw';
 import History from './pages/History';
+import Profile from './pages/Profile';
 import Navbar from './components/Navbar';
 import { User, AppState, UserRole } from './types';
 
@@ -31,7 +32,8 @@ const App: React.FC = () => {
           role: 'ADMIN',
           balance: 0,
           totalEarnings: 0,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          password: 'password123'
         }
       ],
       withdrawals: [],
@@ -43,8 +45,8 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  const login = (email: string) => {
-    const user = state.users.find(u => u.email === email);
+  const login = (email: string, password?: string) => {
+    const user = state.users.find(u => u.email === email && (!u.password || u.password === password));
     if (user) {
       setState(prev => ({ ...prev, currentUser: user }));
       return true;
@@ -80,6 +82,10 @@ const App: React.FC = () => {
 
             <Route path="/history" element={
               state.currentUser ? <History state={state} /> : <Navigate to="/auth" />
+            } />
+
+            <Route path="/profile" element={
+              state.currentUser ? <Profile state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
             } />
 
             <Route path="/admin" element={

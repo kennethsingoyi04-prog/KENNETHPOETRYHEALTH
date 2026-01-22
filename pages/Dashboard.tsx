@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { AppState, Referral } from '../types';
-import { Users, TrendingUp, Share2, Copy, CheckCircle2, DollarSign } from 'lucide-react';
+import { AppState } from '../types';
+import { Users, TrendingUp, Share2, Copy, DollarSign, User as UserIcon } from 'lucide-react';
 
 interface DashboardProps {
   state: AppState;
@@ -13,7 +13,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
   const myReferrals = state.referrals.filter(r => r.referrerId === user.id);
   const myDirectReferralsCount = state.users.filter(u => u.referredBy === user.id).length;
   
-  // Calculate Level 2 referrals (referrals of my referrals)
   const myDirectReferralIds = state.users.filter(u => u.referredBy === user.id).map(u => u.id);
   const myIndirectReferralsCount = state.users.filter(u => myDirectReferralIds.includes(u.referredBy || '')).length;
 
@@ -95,7 +94,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
           </div>
         </div>
         
-        {/* Background Decorative Circles */}
         <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-malawi-red/20 rounded-full blur-3xl"></div>
         <div className="absolute bottom-[-20%] left-[-10%] w-64 h-64 bg-malawi-green/20 rounded-full blur-3xl"></div>
       </div>
@@ -103,8 +101,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
       {/* Recent Activity */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-bold text-lg">Recent Referrals</h3>
-          <button className="text-sm text-blue-600 font-medium">View All</button>
+          <h3 className="font-bold text-lg text-malawi-black">Recent Referrals</h3>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Commission History</p>
         </div>
         <div className="divide-y divide-gray-50">
           {myReferrals.length === 0 ? (
@@ -118,19 +116,23 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
             myReferrals.slice(0, 5).map((ref) => {
               const referredUser = state.users.find(u => u.id === ref.referredId);
               return (
-                <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-malawi-green/10 text-malawi-green rounded-full flex items-center justify-center font-bold">
-                      {referredUser?.fullName.charAt(0)}
+                    <div className="w-10 h-10 bg-malawi-green/10 text-malawi-green rounded-full flex items-center justify-center font-bold overflow-hidden border border-malawi-green/20">
+                      {referredUser?.profilePic ? (
+                        <img src={referredUser.profilePic} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <UserIcon size={18} className="text-malawi-green/40" />
+                      )}
                     </div>
                     <div>
-                      <p className="font-semibold">{referredUser?.fullName}</p>
+                      <p className="font-bold text-gray-900 group-hover:text-malawi-green transition-colors">{referredUser?.fullName}</p>
                       <p className="text-xs text-gray-400">Level {ref.level} • {new Date(ref.timestamp).toLocaleDateString()}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-malawi-green">+MWK {ref.commission.toLocaleString()}</p>
-                    <p className="text-[10px] uppercase text-gray-400">Commission</p>
+                    <p className="font-black text-malawi-green">+MWK {ref.commission.toLocaleString()}</p>
+                    <p className="text-[9px] uppercase font-black text-gray-300">Commission Earned</p>
                   </div>
                 </div>
               );

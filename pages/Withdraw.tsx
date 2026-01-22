@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { AppState, PaymentMethod, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { MIN_WITHDRAWAL } from '../constants';
-import { Wallet, Info, Upload, CheckCircle, Smartphone } from 'lucide-react';
+import { Wallet, Info, Upload, CheckCircle, Smartphone, FileImage } from 'lucide-react';
 import { notifyWithdrawalRequest } from '../services/NotificationService';
 
 interface WithdrawProps {
@@ -16,11 +16,11 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
   const [phone, setPhone] = useState(user.phone);
   const [whatsapp, setWhatsapp] = useState(user.whatsapp);
   const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.AIRTEL_MONEY);
-  const [proof, setProof] = useState<File | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const withdrawAmount = parseFloat(amount);
 
@@ -36,6 +36,20 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
 
     setIsSubmitting(true);
 
+    let finalProofUrl: string | undefined = undefined;
+
+    if (proofFile) {
+      try {
+        finalProofUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(proofFile);
+        });
+      } catch (e) {
+        console.error("Failed to process proof image", e);
+      }
+    }
+
     // Simulate request creation
     const newRequest: WithdrawalRequest = {
       id: `wd-${Date.now()}`,
@@ -47,7 +61,7 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
       paymentMethod: method,
       status: WithdrawalStatus.PENDING,
       createdAt: new Date().toISOString(),
-      proofUrl: proof ? 'https://picsum.photos/400/600' : undefined // Placeholder for local file
+      proofUrl: finalProofUrl
     };
 
     const updatedUser = {
@@ -57,6 +71,7 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
 
     const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
 
+    // Simulate network delay
     setTimeout(() => {
       onStateUpdate({
         withdrawals: [newRequest, ...state.withdrawals],
@@ -64,114 +79,128 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
         currentUser: updatedUser
       });
       
-      // Notify admin about the new withdrawal request
       notifyWithdrawalRequest(user.fullName, withdrawAmount, method);
       
       setIsSubmitting(false);
       setSuccess(true);
       setAmount('');
-    }, 1500);
+      setProofFile(null);
+    }, 1200);
   };
 
   if (success) {
     return (
       <div className="max-w-md mx-auto mt-12 text-center space-y-6 animate-in fade-in zoom-in duration-300">
-        <div className="bg-malawi-green/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto text-malawi-green">
+        <div className="bg-malawi-green/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto text-malawi-green border-4 border-white shadow-xl">
           <CheckCircle size={48} />
         </div>
-        <h2 className="text-3xl font-bold">Request Submitted!</h2>
-        <p className="text-gray-600">
-          Your withdrawal request for <strong>MWK {amount}</strong> is being processed. 
-          You will receive a notification via WhatsApp once approved.
+        <h2 className="text-3xl font-black text-malawi-black uppercase tracking-tight">Request Submitted!</h2>
+        <p className="text-gray-600 leading-relaxed">
+          Your payout for <span className="text-malawi-green font-bold">MWK {amount}</span> is now in the verification queue. 
+          Expect a confirmation on WhatsApp (+{whatsapp}) within 24 hours.
         </p>
         <button 
           onClick={() => setSuccess(false)}
-          className="bg-malawi-black text-white px-8 py-3 rounded-xl font-bold w-full"
+          className="bg-malawi-black hover:bg-gray-800 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all w-full shadow-lg shadow-black/10"
         >
-          Make Another Request
+          Finish & Return
         </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+    <div className="max-w-xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center transition-all hover:shadow-md">
         <div>
-          <p className="text-gray-500 text-sm">Available Balance</p>
-          <p className="text-3xl font-bold text-malawi-green">MWK {user.balance.toLocaleString()}</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Available Payout Balance</p>
+          <p className="text-4xl font-black text-malawi-green">MWK {user.balance.toLocaleString()}</p>
         </div>
-        <Wallet className="text-gray-200" size={48} />
+        <div className="bg-gray-50 p-4 rounded-2xl">
+          <Wallet className="text-gray-300" size={32} />
+        </div>
       </div>
 
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex gap-3 text-sm text-blue-800">
-        <div className="bg-blue-100 p-1 rounded-md h-fit"><Info size={20} className="shrink-0" /></div>
-        <div>
-          <p className="font-bold">Withdrawal Rules:</p>
-          <ul className="list-disc ml-4 mt-1">
-            <li>Minimum withdrawal: MWK {MIN_WITHDRAWAL.toLocaleString()}</li>
-            <li>Processing time: 1-24 hours</li>
-            <li>Make sure your phone number matches your mobile money account.</li>
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-r-3xl flex gap-4 text-sm text-blue-900 shadow-sm">
+        <div className="bg-blue-500/10 p-2 rounded-xl h-fit"><Info size={20} className="text-blue-600 shrink-0" /></div>
+        <div className="space-y-1">
+          <p className="font-black uppercase text-[10px] tracking-widest">Withdrawal Guidelines</p>
+          <ul className="list-disc ml-4 mt-1 space-y-1 text-xs font-medium text-blue-800/80">
+            <li>Minimum payout threshold: <span className="font-bold">MWK {MIN_WITHDRAWAL.toLocaleString()}</span></li>
+            <li>Standard processing window: <span className="font-bold">1 - 12 hours</span></li>
+            <li>Verify your mobile number to avoid transaction delays.</li>
           </ul>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 space-y-6">
-        <h2 className="text-xl font-bold border-b pb-4">New Withdrawal Request</h2>
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 space-y-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-malawi-green/5 rounded-full -mr-16 -mt-16"></div>
         
-        <div className="grid grid-cols-2 gap-4">
-          <button 
-            type="button"
-            onClick={() => setMethod(PaymentMethod.AIRTEL_MONEY)}
-            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-              method === PaymentMethod.AIRTEL_MONEY ? 'border-malawi-red bg-red-50' : 'border-gray-100 hover:border-gray-300'
-            }`}
-          >
-            <Smartphone size={24} className="text-malawi-red" />
-            <span className="font-bold text-sm">Airtel Money</span>
-          </button>
-          
-          <button 
-            type="button"
-            onClick={() => setMethod(PaymentMethod.TNM_MPAMBA)}
-            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-              method === PaymentMethod.TNM_MPAMBA ? 'border-malawi-green bg-green-50' : 'border-gray-100 hover:border-gray-300'
-            }`}
-          >
-            <Smartphone size={24} className="text-malawi-green" />
-            <span className="font-bold text-sm">TNM Mpamba</span>
-          </button>
+        <h2 className="text-2xl font-black text-malawi-black uppercase tracking-tight border-b border-gray-100 pb-4">Payout Application</h2>
+        
+        <div className="space-y-4">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Gateway</p>
+          <div className="grid grid-cols-2 gap-4">
+            <button 
+              type="button"
+              onClick={() => setMethod(PaymentMethod.AIRTEL_MONEY)}
+              className={`p-5 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
+                method === PaymentMethod.AIRTEL_MONEY ? 'border-malawi-red bg-red-50 ring-4 ring-red-500/5' : 'border-gray-50 hover:border-gray-200 bg-gray-50/50'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${method === PaymentMethod.AIRTEL_MONEY ? 'bg-malawi-red text-white' : 'bg-gray-100 text-gray-400'}`}>
+                <Smartphone size={24} />
+              </div>
+              <span className="font-black text-[10px] uppercase tracking-wider">Airtel Money</span>
+            </button>
+            
+            <button 
+              type="button"
+              onClick={() => setMethod(PaymentMethod.TNM_MPAMBA)}
+              className={`p-5 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
+                method === PaymentMethod.TNM_MPAMBA ? 'border-malawi-green bg-green-50 ring-4 ring-green-500/5' : 'border-gray-50 hover:border-gray-200 bg-gray-50/50'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${method === PaymentMethod.TNM_MPAMBA ? 'bg-malawi-green text-white' : 'bg-gray-100 text-gray-400'}`}>
+                <Smartphone size={24} />
+              </div>
+              <span className="font-black text-[10px] uppercase tracking-wider">TNM Mpamba</span>
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Withdrawal Amount (MWK)</label>
-          <input 
-            type="number"
-            required
-            placeholder="e.g. 10000"
-            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-malawi-black outline-none"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cash Out Amount (MWK)</label>
+          <div className="relative">
+             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">MWK</div>
+             <input 
+               type="number"
+               required
+               placeholder="Enter amount..."
+               className="w-full pl-16 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-malawi-green outline-none font-black text-lg transition-all"
+               value={amount}
+               onChange={(e) => setAmount(e.target.value)}
+             />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Mobile Number</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Destination Number</label>
             <input 
               type="tel"
               required
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green font-medium transition-all"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">WhatsApp Number</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Verification</label>
             <input 
               type="tel"
               required
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green font-medium transition-all"
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
             />
@@ -179,25 +208,44 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Upload Identity/Proof (Optional)</label>
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center text-gray-500 hover:border-malawi-black transition-colors cursor-pointer relative">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identity Verification (Upload ID)</label>
+          <div className="border-2 border-dashed border-gray-200 rounded-3xl p-10 flex flex-col items-center justify-center text-gray-400 hover:border-malawi-green hover:bg-green-50/30 transition-all cursor-pointer relative group">
             <input 
               type="file" 
-              className="absolute inset-0 opacity-0 cursor-pointer" 
-              onChange={(e) => setProof(e.target.files?.[0] || null)}
+              className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+              accept="image/*"
+              onChange={(e) => setProofFile(e.target.files?.[0] || null)}
             />
-            <Upload size={32} className="mb-2" />
-            <p className="text-sm">{proof ? proof.name : "Click to upload screenshot"}</p>
+            {proofFile ? (
+              <div className="flex flex-col items-center gap-2 animate-in zoom-in">
+                <div className="bg-malawi-green text-white p-3 rounded-2xl shadow-lg">
+                  <FileImage size={32} />
+                </div>
+                <p className="text-sm font-bold text-gray-700">{proofFile.name}</p>
+                <p className="text-[10px] uppercase font-black text-malawi-green">Click to replace file</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 group-hover:scale-105 transition-transform">
+                <Upload size={40} className="mb-2 text-gray-300 group-hover:text-malawi-green transition-colors" />
+                <p className="text-sm font-bold text-gray-600">Click or Drag Proof of ID</p>
+                <p className="text-[10px] uppercase font-black text-gray-400">JPG, PNG up to 5MB</p>
+              </div>
+            )}
           </div>
         </div>
 
         <button 
           disabled={isSubmitting}
-          className={`w-full py-4 rounded-xl text-white font-bold transition-all ${
-            isSubmitting ? 'bg-gray-400' : 'bg-malawi-black hover:bg-gray-800'
+          className={`w-full py-5 rounded-2xl text-white font-black uppercase tracking-widest text-xs shadow-xl transition-all flex items-center justify-center gap-2 ${
+            isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-malawi-black hover:bg-gray-800 hover:scale-[1.01] active:scale-[0.99] shadow-black/20'
           }`}
         >
-          {isSubmitting ? 'Submitting...' : 'Request Payout Now'}
+          {isSubmitting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              Processing...
+            </>
+          ) : 'Request Withdrawal Now'}
         </button>
       </form>
     </div>

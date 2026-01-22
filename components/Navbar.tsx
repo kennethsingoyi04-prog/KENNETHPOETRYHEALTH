@@ -6,10 +6,9 @@ import {
   LayoutDashboard, 
   Wallet, 
   History as HistoryIcon, 
-  Settings, 
   LogOut, 
   ShieldCheck,
-  TrendingUp
+  User as UserIcon
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -60,6 +59,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout }) => {
               <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
               <NavItem to="/withdraw" icon={Wallet} label="Withdraw" />
               <NavItem to="/history" icon={HistoryIcon} label="History" />
+              <NavItem to="/profile" icon={UserIcon} label="Profile" />
               {currentUser.role === 'ADMIN' && (
                 <NavItem to="/admin" icon={ShieldCheck} label="Admin" />
               )}
@@ -71,12 +71,21 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout }) => {
               <p className="text-xs text-gray-400">Balance</p>
               <p className="text-sm font-bold text-malawi-green">MWK {currentUser.balance.toLocaleString()}</p>
             </div>
+            
+            <Link to="/profile" className="w-10 h-10 rounded-full border-2 border-malawi-green overflow-hidden bg-gray-800 flex items-center justify-center">
+              {currentUser.profilePic ? (
+                <img src={currentUser.profilePic} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon size={20} className="text-gray-400" />
+              )}
+            </Link>
+
             <button 
               onClick={onLogout}
               className="flex items-center gap-2 bg-malawi-red/20 hover:bg-malawi-red text-malawi-red hover:text-white px-4 py-2 rounded-lg transition-all"
             >
               <LogOut size={18} />
-              <span>Logout</span>
+              <span className="hidden lg:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -87,6 +96,16 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout }) => {
         <NavItem to="/dashboard" icon={LayoutDashboard} label="Home" />
         <NavItem to="/withdraw" icon={Wallet} label="Wallet" />
         <NavItem to="/history" icon={HistoryIcon} label="History" />
+        <Link to="/profile" className={`flex flex-col items-center gap-1 p-2 rounded-lg ${location.pathname === '/profile' ? 'text-malawi-green' : 'text-gray-400'}`}>
+          <div className="w-6 h-6 rounded-full overflow-hidden border border-current flex items-center justify-center">
+            {currentUser.profilePic ? (
+              <img src={currentUser.profilePic} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <UserIcon size={14} />
+            )}
+          </div>
+          <span className="text-[10px] font-medium">Profile</span>
+        </Link>
         {currentUser.role === 'ADMIN' ? (
           <NavItem to="/admin" icon={ShieldCheck} label="Admin" />
         ) : (
