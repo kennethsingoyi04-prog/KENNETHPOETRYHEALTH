@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AppState, WithdrawalStatus } from '../types';
-import { Download, Clock, CheckCircle2, XCircle, FileText } from 'lucide-react';
+import { Download, Clock, CheckCircle2, XCircle, FileText, Info } from 'lucide-react';
 
 interface HistoryProps {
   state: AppState;
@@ -57,21 +57,24 @@ const History: React.FC<HistoryProps> = ({ state }) => {
                     <th className="px-6 py-4 font-bold text-gray-700">Amount</th>
                     <th className="px-6 py-4 font-bold text-gray-700">Method</th>
                     <th className="px-6 py-4 font-bold text-gray-700">Status</th>
-                    <th className="px-6 py-4 font-bold text-gray-700">Receipt</th>
+                    <th className="px-6 py-4 font-bold text-gray-700">Note/Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {myWithdrawals.map((w) => (
                     <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4 text-gray-500">{new Date(w.createdAt).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 font-bold">MWK {w.amount.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-gray-600">{w.paymentMethod}</td>
-                      <td className="px-6 py-4">{getStatusBadge(w.status)}</td>
-                      <td className="px-6 py-4">
-                        {w.status === WithdrawalStatus.APPROVED && (
-                          <button className="text-blue-600 hover:underline flex items-center gap-1">
-                            <Download size={14} /> PDF
-                          </button>
+                      <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{new Date(w.createdAt).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 font-bold whitespace-nowrap">MWK {w.amount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{w.paymentMethod}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(w.status)}</td>
+                      <td className="px-6 py-4 min-w-[200px]">
+                        {w.adminNote ? (
+                          <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                            <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-blue-700 leading-relaxed italic">{w.adminNote}</p>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300 text-[11px] italic">No extra feedback</span>
                         )}
                       </td>
                     </tr>
@@ -85,7 +88,7 @@ const History: React.FC<HistoryProps> = ({ state }) => {
 
       <section className="space-y-4">
         <h2 className="text-lg font-bold flex items-center gap-2">
-          <TrendingUp className="text-malawi-green" size={20} />
+          <TrendingUpIcon className="text-malawi-green" size={20} />
           Earnings Breakdown
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -109,8 +112,8 @@ const History: React.FC<HistoryProps> = ({ state }) => {
   );
 };
 
-// Simple icon for earnings
-const TrendingUp = ({ className, size }: { className?: string, size: number }) => (
+// Renamed internal component to avoid conflict with imports
+const TrendingUpIcon = ({ className, size }: { className?: string, size: number }) => (
   <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
 );
 

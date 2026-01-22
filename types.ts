@@ -37,6 +37,7 @@ export interface WithdrawalRequest {
   proofUrl?: string;
   status: WithdrawalStatus;
   createdAt: string;
+  adminNote?: string;
 }
 
 export interface Referral {

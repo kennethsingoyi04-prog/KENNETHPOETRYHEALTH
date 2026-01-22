@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AppState, User, Referral } from '../types';
 import { LEVEL_1_COMMISSION_PERCENT, LEVEL_2_COMMISSION_PERCENT, SIGNUP_BONUS } from '../constants';
 import { Mail, Lock, User as UserIcon, Phone, Smartphone, ChevronRight } from 'lucide-react';
+import { notifyNewRegistration } from '../services/NotificationService';
 
 interface AuthProps {
   state: AppState;
@@ -101,6 +102,9 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         referrals: updatedReferrals,
         currentUser: newUser
       });
+
+      // Notify admin about the new registration
+      notifyNewRegistration(newUser.fullName, newUser.email, newUserReferralCode);
     }
   };
 

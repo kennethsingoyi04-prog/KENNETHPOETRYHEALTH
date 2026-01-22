@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { AppState, PaymentMethod, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { MIN_WITHDRAWAL } from '../constants';
 import { Wallet, Info, Upload, CheckCircle, Smartphone } from 'lucide-react';
+import { notifyWithdrawalRequest } from '../services/NotificationService';
 
 interface WithdrawProps {
   state: AppState;
@@ -62,6 +63,10 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
         users: updatedUsers,
         currentUser: updatedUser
       });
+      
+      // Notify admin about the new withdrawal request
+      notifyWithdrawalRequest(user.fullName, withdrawAmount, method);
+      
       setIsSubmitting(false);
       setSuccess(true);
       setAmount('');
@@ -100,7 +105,7 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
       </div>
 
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex gap-3 text-sm text-blue-800">
-        <Info size={20} className="shrink-0" />
+        <div className="bg-blue-100 p-1 rounded-md h-fit"><Info size={20} className="shrink-0" /></div>
         <div>
           <p className="font-bold">Withdrawal Rules:</p>
           <ul className="list-disc ml-4 mt-1">

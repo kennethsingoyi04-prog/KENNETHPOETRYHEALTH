@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { AppState, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { 
@@ -15,7 +14,13 @@ import {
   X,
   Maximize2,
   Clock,
-  LayoutGrid
+  LayoutGrid,
+  ZoomIn,
+  Minimize2,
+  PieChart as PieIcon,
+  MessageSquare,
+  Save,
+  Check
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -42,6 +47,10 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate }) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [tempNote, setTempNote] = useState("");
+  const [noteSavedId, setNoteSavedId] = useState<string | null>(null);
 
   const totalUsers = state.users.length;
   const totalBalance = state.users.reduce((acc, u) => acc + u.balance, 0);
@@ -53,7 +62,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   // --- Data Calculations for Charts ---
 
   const userGrowthData = useMemo(() => {
-    const sortedUsers = [...state.users].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const sortedUsers = [...state.users].sort((a, b) => {
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
     const growthMap = new Map<string, number>();
     let cumulative = 0;
     
@@ -67,17 +78,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   }, [state.users]);
 
   const dailyEarningsData = useMemo(() => {
-    const earningsMap = new Map<string, number>();
+    const earningsMap = new Map<string, { amount: number, rawDate: number }>();
     state.referrals.forEach(ref => {
-      const date = new Date(ref.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      earningsMap.set(date, (earningsMap.get(date) || 0) + ref.commission);
+      const d = new Date(ref.timestamp);
+      const dateLabel = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const current = earningsMap.get(dateLabel) || { amount: 0, rawDate: d.getTime() };
+      
+      earningsMap.set(dateLabel, { 
+        amount: current.amount + ref.commission,
+        rawDate: current.rawDate
+      });
     });
 
-    const data = Array.from(earningsMap.entries()).map(([date, amount]) => ({ 
+    const data = Array.from(earningsMap.entries()).map(([date, val]) => ({ 
       date, 
-      amount,
-      rawDate: new Date(date).getTime()
+      amount: val.amount,
+      rawDate: val.rawDate
     }));
+    
     return data.sort((a, b) => a.rawDate - b.rawDate);
   }, [state.referrals]);
 
@@ -87,7 +105,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     state.referrals.forEach(ref => {
       const d = new Date(ref.timestamp);
       const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       const startOfWeek = new Date(d.setDate(diff));
       const weekLabel = `Week of ${startOfWeek.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
       
@@ -119,9 +137,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       return acc;
     }, {} as Record<string, number>);
 
-    return Object.entries(counts).map(([name, value]) => ({
+    const total = state.withdrawals.length || 1;
+
+    // Explicitly cast to [string, number][] to avoid inference issues with arithmetic operations on 'value'
+    return (Object.entries(counts) as [string, number][]).map(([name, value]) => ({
       name,
       value,
+      percentage: ((value / total) * 100).toFixed(1),
       color: name.includes('Airtel') ? '#D21034' : '#118131'
     }));
   }, [state.withdrawals]);
@@ -149,37 +171,84 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     }
   };
 
+  const saveAdminNote = (id: string) => {
+    const updatedWithdrawals = state.withdrawals.map(w => 
+      w.id === id ? { ...w, adminNote: tempNote } : w
+    );
+    onStateUpdate({ withdrawals: updatedWithdrawals });
+    setEditingNoteId(null);
+    setNoteSavedId(id);
+    setTimeout(() => setNoteSavedId(null), 2000);
+  };
+
+  const closePreview = () => {
+    setPreviewImage(null);
+    setIsZoomed(false);
+  };
+
   return (
     <div className="space-y-8 pb-12">
-      {/* Proof Preview Modal */}
+      {/* Proof Preview Modal with Interactive Zoom */}
       {previewImage && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200"
-          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-[100] bg-black/95 flex flex-col animate-in fade-in duration-200"
+          onClick={closePreview}
         >
-          <div className="absolute top-6 right-6 flex gap-4">
-            <a 
-              href={previewImage} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-white bg-malawi-green hover:bg-green-700 px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-bold text-sm"
-              onClick={e => e.stopPropagation()}
-            >
-              <ExternalLink size={18} /> Open in New Tab
-            </a>
+          {/* Header Controls */}
+          <div 
+            className="p-6 flex justify-between items-center bg-black/40 backdrop-blur-md z-[110]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setIsZoomed(!isZoomed)}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold transition-all border border-white/10"
+              >
+                {isZoomed ? <Minimize2 size={20} /> : <ZoomIn size={20} />}
+                <span>{isZoomed ? 'Reset Zoom' : 'Zoom In'}</span>
+              </button>
+              <a 
+                href={previewImage} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-white bg-malawi-green hover:bg-green-700 px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-bold"
+              >
+                <ExternalLink size={20} /> <span className="hidden sm:inline">Open Full Image</span>
+              </a>
+            </div>
             <button 
-              className="text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
-              onClick={() => setPreviewImage(null)}
+              className="text-white bg-malawi-red/80 hover:bg-malawi-red p-2 rounded-full transition-all shadow-lg"
+              onClick={closePreview}
             >
-              <X size={28} />
+              <X size={32} />
             </button>
           </div>
-          <div className="relative max-w-4xl w-full max-h-full flex items-center justify-center" onClick={e => e.stopPropagation()}>
+
+          {/* Image Container */}
+          <div 
+            className={`flex-grow relative overflow-auto flex items-center justify-center p-4 sm:p-10 ${
+              isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsZoomed(!isZoomed);
+            }}
+          >
             <img 
               src={previewImage} 
               alt="Proof Preview" 
-              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/10 shadow-white/5"
+              className={`transition-all duration-500 ease-out rounded-lg shadow-2xl border border-white/5 ${
+                isZoomed 
+                  ? 'scale-150 min-w-[120%] my-auto' 
+                  : 'max-w-full max-h-[85vh] object-contain'
+              }`}
             />
+          </div>
+          
+          <div className="p-4 text-center bg-black/40 backdrop-blur-sm">
+            <p className="text-white/40 text-xs font-bold uppercase tracking-widest">
+              {isZoomed ? 'Pannable View Active' : 'Click image or use button above to zoom'}
+            </p>
           </div>
         </div>
       )}
@@ -298,7 +367,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       </div>
 
-      {/* NEW SECTION: Earnings Analytics */}
+      {/* Earnings Analytics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
@@ -355,26 +424,69 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      {/* Payment Distribution Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
+              <PieIcon size={18} className="text-malawi-red" /> Payment Distribution
+            </h3>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">By Provider</span>
+          </div>
+          <div className="h-[280px] w-full flex items-center justify-center relative">
+            {methodData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={methodData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={90}
+                    innerRadius={45}
+                    paddingAngle={8}
+                    dataKey="value"
+                    animationDuration={1500}
+                  >
+                    {methodData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={2} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: number, name: string, props: any) => [
+                      `${value} requests (${props.payload.percentage}%)`, 
+                      name
+                    ]}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-gray-400 italic text-sm">Waiting for withdrawal data...</div>
+            )}
+          </div>
+        </div>
+
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><LayoutGrid size={18} className="text-gray-700" /> Channel Insights</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6 flex flex-col justify-center h-full">
             <div className="space-y-4">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Payout Method Split</p>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Request Volume Breakdown</p>
               {methodData.length > 0 ? methodData.map(method => (
                 <div key={method.name} className="space-y-1">
                   <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase">
                     <span>{method.name}</span>
-                    <span>{method.value} Requests</span>
+                    <span>{method.value} Requests ({method.percentage}%)</span>
                   </div>
                   <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
                     <div 
-                      className="h-full rounded-full transition-all duration-500" 
+                      className="h-full rounded-full transition-all duration-700 ease-in-out" 
                       style={{ 
                         backgroundColor: method.color, 
-                        width: `${(method.value / (state.withdrawals.length || 1)) * 100}%` 
+                        width: `${method.percentage}%` 
                       }}
                     />
                   </div>
@@ -384,11 +496,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
               )}
             </div>
             
-            <div className="bg-gray-50 rounded-2xl p-6 flex flex-col justify-center border border-dashed border-gray-200">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">System Performance Note</h4>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Total earnings tracked across all levels (L1: {state.referrals.filter(r => r.level === 1).length} refs, L2: {state.referrals.filter(r => r.level === 2).length} refs). 
-                The revenue charts above reflect commissions generated by new user signups and platform activities.
+            <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-center border border-dashed border-gray-200 mt-4">
+              <h4 className="text-[10px] font-black text-gray-700 uppercase mb-2">Network Health Note</h4>
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Total earnings tracked across all levels. Airtel Money and TNM Mpamba are currently the only supported payout gateways for KENNETHPOETRYHEALTH affiliates.
               </p>
             </div>
           </div>
@@ -443,21 +554,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                     <td className="px-6 py-4">
                       {w.proofUrl ? (
                         <div className="flex gap-2 items-center">
-                          <a 
-                            href={w.proofUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button 
+                            onClick={() => {
+                              setPreviewImage(w.proofUrl!);
+                              setIsZoomed(false);
+                            }}
                             className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 text-xs font-bold underline transition-colors group"
                           >
-                            <ExternalLink size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" /> 
+                            <ZoomIn size={14} className="group-hover:scale-110 transition-transform" /> 
                             View Proof
-                          </a>
-                          <button 
-                            onClick={() => setPreviewImage(w.proofUrl!)}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="Quick Preview"
-                          >
-                            <Maximize2 size={12} />
                           </button>
                         </div>
                       ) : <span className="text-gray-400 text-xs italic font-medium">No Proof</span>}
@@ -484,6 +589,100 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      </section>
+
+      {/* NEW SECTION: Withdrawal Notes Management */}
+      <section className="bg-white rounded-2 shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter flex items-center gap-2">
+            <MessageSquare size={20} className="text-malawi-green" /> Withdrawal Feedback & Notes
+          </h3>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">User Visible Comments</p>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            {state.withdrawals.length === 0 ? (
+              <p className="text-center py-8 text-gray-400 text-sm italic">No withdrawal requests to annotate.</p>
+            ) : (
+              state.withdrawals.slice(0, 5).map((w) => (
+                <div key={w.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors group">
+                  <div className="flex-grow">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-gray-900 text-sm">{w.userName}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">#{w.id}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
+                        w.status === WithdrawalStatus.PENDING ? 'bg-yellow-100 text-yellow-700' :
+                        w.status === WithdrawalStatus.APPROVED ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {w.status}
+                      </span>
+                    </div>
+                    {editingNoteId === w.id ? (
+                      <div className="mt-2 flex flex-col gap-2">
+                        <textarea 
+                          value={tempNote}
+                          onChange={(e) => setTempNote(e.target.value)}
+                          placeholder="Add reason for rejection or payment reference..."
+                          className="w-full text-sm p-3 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-malawi-green h-20 resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => saveAdminNote(w.id)}
+                            className="bg-malawi-green text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-green-700 transition-colors shadow-sm"
+                          >
+                            <Save size={14} /> Save Note
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditingNoteId(null);
+                              setTempNote("");
+                            }}
+                            className="text-gray-500 hover:text-gray-700 text-xs font-bold px-3 py-1.5"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 transition-colors flex items-center gap-2"
+                        onClick={() => {
+                          setEditingNoteId(w.id);
+                          setTempNote(w.adminNote || "");
+                        }}
+                      >
+                        {w.adminNote ? (
+                          <span className="italic leading-relaxed">"{w.adminNote}"</span>
+                        ) : (
+                          <span className="text-gray-400 flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <MessageSquare size={12} /> Click to add internal note or user feedback...
+                          </span>
+                        )}
+                        {noteSavedId === w.id && <Check size={14} className="text-malawi-green animate-bounce" />}
+                      </div>
+                    )}
+                  </div>
+                  {!editingNoteId && (
+                    <button 
+                      onClick={() => {
+                        setEditingNoteId(w.id);
+                        setTempNote(w.adminNote || "");
+                      }}
+                      className="shrink-0 text-[10px] font-black uppercase tracking-tighter text-malawi-green bg-green-50 px-2 py-1 rounded border border-green-100 hover:bg-green-100 transition-colors"
+                    >
+                      {w.adminNote ? 'Edit Note' : 'Add Note'}
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          {state.withdrawals.length > 5 && (
+            <p className="mt-4 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">
+              Showing 5 most recent requests. Use search to find older entries.
+            </p>
           )}
         </div>
       </section>
