@@ -13,7 +13,9 @@ import {
   PieChart as PieChartIcon,
   Calendar,
   X,
-  Maximize2
+  Maximize2,
+  Clock,
+  LayoutGrid
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -23,14 +25,14 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
-  Legend
+  PieChart, 
+  Pie, 
+  Cell, 
+  AreaChart, 
+  Area, 
+  LineChart, 
+  Line, 
+  Legend 
 } from 'recharts';
 
 interface AdminDashboardProps {
@@ -71,8 +73,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       earningsMap.set(date, (earningsMap.get(date) || 0) + ref.commission);
     });
 
-    const data = Array.from(earningsMap.entries()).map(([date, amount]) => ({ date, amount }));
-    return data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const data = Array.from(earningsMap.entries()).map(([date, amount]) => ({ 
+      date, 
+      amount,
+      rawDate: new Date(date).getTime()
+    }));
+    return data.sort((a, b) => a.rawDate - b.rawDate);
+  }, [state.referrals]);
+
+  const weeklyEarningsData = useMemo(() => {
+    const earningsMap = new Map<string, number>();
+    
+    state.referrals.forEach(ref => {
+      const d = new Date(ref.timestamp);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      const startOfWeek = new Date(d.setDate(diff));
+      const weekLabel = `Week of ${startOfWeek.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+      
+      earningsMap.set(weekLabel, (earningsMap.get(weekLabel) || 0) + ref.commission);
+    });
+
+    return Array.from(earningsMap.entries()).map(([week, amount]) => ({ 
+      week, 
+      amount 
+    }));
   }, [state.referrals]);
 
   const withdrawalStatusData = useMemo(() => {
@@ -126,7 +151,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Proof Preview Modal (Still available for quick view) */}
+      {/* Proof Preview Modal */}
       {previewImage && (
         <div 
           className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200"
@@ -271,24 +296,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
             ))}
           </div>
         </div>
+      </div>
 
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+      {/* NEW SECTION: Earnings Analytics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><Calendar size={18} className="text-malawi-green" /> Earning Velocity</h3>
-            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Daily Sums</span>
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
+              <Calendar size={18} className="text-malawi-green" /> Daily Earnings (MWK)
+            </h3>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">Daily Totals</span>
           </div>
-          <div className="h-[250px] w-full">
+          <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyEarningsData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
                 <Tooltip 
                    cursor={{fill: '#f8fafc'}}
-                   formatter={(value: number) => [`MWK ${value.toLocaleString()}`, 'Earnings']}
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                   formatter={(value: number) => [`MWK ${value.toLocaleString()}`, 'Total Commissions']}
+                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
                 />
-                <Bar dataKey="amount" fill="#118131" radius={[4, 4, 0, 0]} barSize={32} />
+                <Bar dataKey="amount" fill="#118131" radius={[6, 6, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -296,28 +326,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><Wallet size={18} className="text-gray-700" /> Channel Usage</h3>
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
+              <TrendingUp size={18} className="text-malawi-red" /> Weekly Performance
+            </h3>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">Weekly Trend</span>
           </div>
-          <div className="space-y-4">
-            {methodData.length > 0 ? methodData.map(method => (
-              <div key={method.name} className="space-y-1">
-                <div className="flex justify-between text-xs font-bold text-gray-500 uppercase">
-                  <span>{method.name}</span>
-                  <span>{method.value} Requests</span>
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={weeklyEarningsData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                <Tooltip 
+                   formatter={(value: number) => [`MWK ${value.toLocaleString()}`, 'Weekly Revenue']}
+                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="amount" 
+                  stroke="#D21034" 
+                  strokeWidth={4} 
+                  dot={{ r: 6, fill: '#D21034', strokeWidth: 2, stroke: '#fff' }} 
+                  activeDot={{ r: 8, strokeWidth: 0 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><LayoutGrid size={18} className="text-gray-700" /> Channel Insights</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Payout Method Split</p>
+              {methodData.length > 0 ? methodData.map(method => (
+                <div key={method.name} className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase">
+                    <span>{method.name}</span>
+                    <span>{method.value} Requests</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
+                    <div 
+                      className="h-full rounded-full transition-all duration-500" 
+                      style={{ 
+                        backgroundColor: method.color, 
+                        width: `${(method.value / (state.withdrawals.length || 1)) * 100}%` 
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
-                  <div 
-                    className="h-full rounded-full transition-all duration-500" 
-                    style={{ 
-                      backgroundColor: method.color, 
-                      width: `${(method.value / (state.withdrawals.length || 1)) * 100}%` 
-                    }}
-                  />
-                </div>
-              </div>
-            )) : (
-              <p className="text-center text-gray-400 py-8 text-sm italic">No payout data yet</p>
-            )}
+              )) : (
+                <p className="text-center text-gray-400 py-8 text-sm italic">No payout data yet</p>
+              )}
+            </div>
+            
+            <div className="bg-gray-50 rounded-2xl p-6 flex flex-col justify-center border border-dashed border-gray-200">
+              <h4 className="text-sm font-bold text-gray-700 mb-2">System Performance Note</h4>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Total earnings tracked across all levels (L1: {state.referrals.filter(r => r.level === 1).length} refs, L2: {state.referrals.filter(r => r.level === 2).length} refs). 
+                The revenue charts above reflect commissions generated by new user signups and platform activities.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -458,10 +531,5 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     </div>
   );
 };
-
-// Simple Clock Icon for Pending
-const Clock = ({ className, size }: { className?: string, size: number }) => (
-  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-);
 
 export default AdminDashboard;
