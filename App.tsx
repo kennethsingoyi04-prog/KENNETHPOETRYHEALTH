@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import ProofPreview from './pages/ProofPreview';
 import Withdraw from './pages/Withdraw';
 import History from './pages/History';
 import Navbar from './components/Navbar';
@@ -83,6 +84,10 @@ const App: React.FC = () => {
 
             <Route path="/admin" element={
               state.currentUser?.role === 'ADMIN' ? <AdminDashboard state={state} onStateUpdate={updateUserState} /> : <Navigate to="/dashboard" />
+            } />
+
+            <Route path="/admin/proof-preview" element={
+              state.currentUser?.role === 'ADMIN' ? <ProofPreview /> : <Navigate to="/auth" />
             } />
 
             <Route path="/" element={<Navigate to="/auth" />} />

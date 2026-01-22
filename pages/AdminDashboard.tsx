@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppState, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { 
   Users, 
@@ -22,7 +23,9 @@ import {
   MessageSquare,
   Save,
   Check,
-  Activity
+  Activity,
+  FileSpreadsheet,
+  Filter
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -48,11 +51,11 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate }) => {
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [isZoomed, setIsZoomed] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [tempNote, setTempNote] = useState("");
   const [noteSavedId, setNoteSavedId] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+  const [queueSearch, setQueueSearch] = useState("");
 
   const totalUsers = state.users.length;
   const totalBalance = state.users.reduce((acc, u) => acc + u.balance, 0);
@@ -60,6 +63,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const totalPayouts = state.withdrawals
     .filter(w => w.status === WithdrawalStatus.APPROVED)
     .reduce((acc, w) => acc + w.amount, 0);
+
+  // --- Search & Filter Logic ---
+  const filteredUsers = useMemo(() => {
+    return state.users.filter(u => 
+      u.fullName.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.referralCode.toLowerCase().includes(userSearch.toLowerCase())
+    );
+  }, [state.users, userSearch]);
+
+  const filteredQueue = useMemo(() => {
+    return pendingWithdrawals.filter(w => 
+      w.userName.toLowerCase().includes(queueSearch.toLowerCase()) ||
+      w.phone.includes(queueSearch) ||
+      w.id.includes(queueSearch)
+    );
+  }, [pendingWithdrawals, queueSearch]);
+
+  // --- Export Logic ---
+  const exportToCSV = (data: any[], filename: string) => {
+    if (!data.length) return;
+    const headers = Object.keys(data[0]).join(',');
+    const rows = data.map(obj => 
+      Object.values(obj).map(val => `"${val}"`).join(',')
+    ).join('\n');
+    
+    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rows;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${filename}_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // --- Data Calculations for Charts ---
 
@@ -199,78 +237,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     setTimeout(() => setNoteSavedId(null), 2000);
   };
 
-  const closePreview = () => {
-    setPreviewImage(null);
-    setIsZoomed(false);
-  };
-
   return (
     <div className="space-y-8 pb-12">
-      {/* Proof Preview Modal with Interactive Zoom */}
-      {previewImage && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/95 flex flex-col animate-in fade-in duration-200"
-          onClick={closePreview}
-        >
-          {/* Header Controls */}
-          <div 
-            className="p-6 flex justify-between items-center bg-black/40 backdrop-blur-md z-[110]"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex gap-4">
-              <button 
-                onClick={() => setIsZoomed(!isZoomed)}
-                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold transition-all border border-white/10"
-              >
-                {isZoomed ? <Minimize2 size={20} /> : <ZoomIn size={20} />}
-                <span>{isZoomed ? 'Reset Zoom' : 'Zoom In'}</span>
-              </button>
-              <a 
-                href={previewImage} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-white bg-malawi-green hover:bg-green-700 px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-bold"
-              >
-                <ExternalLink size={20} /> <span className="hidden sm:inline">Open Full Image</span>
-              </a>
-            </div>
-            <button 
-              className="text-white bg-malawi-red/80 hover:bg-malawi-red p-2 rounded-full transition-all shadow-lg"
-              onClick={closePreview}
-            >
-              <X size={32} />
-            </button>
-          </div>
-
-          {/* Image Container */}
-          <div 
-            className={`flex-grow relative overflow-auto flex items-center justify-center p-4 sm:p-10 ${
-              isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsZoomed(!isZoomed);
-            }}
-          >
-            <img 
-              src={previewImage} 
-              alt="Proof Preview" 
-              className={`transition-all duration-500 ease-out rounded-lg shadow-2xl border border-white/5 ${
-                isZoomed 
-                  ? 'scale-150 min-w-[120%] my-auto' 
-                  : 'max-w-full max-h-[85vh] object-contain'
-              }`}
-            />
-          </div>
-          
-          <div className="p-4 text-center bg-black/40 backdrop-blur-sm">
-            <p className="text-white/40 text-xs font-bold uppercase tracking-widest">
-              {isZoomed ? 'Pannable View Active' : 'Click image or use button above to zoom'}
-            </p>
-          </div>
-        </div>
-      )}
-
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-malawi-black tracking-tight uppercase">Admin Control Center</h1>
@@ -279,7 +247,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         <div className="flex gap-2">
           <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
             <div className="bg-gray-100 p-2 rounded-lg text-gray-600"><Search size={18} /></div>
-            <input type="text" placeholder="Search accounts..." className="outline-none text-sm w-32 md:w-48" />
+            <input 
+              type="text" 
+              placeholder="Search directory..." 
+              className="outline-none text-sm w-32 md:w-48"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+            />
           </div>
         </div>
       </header>
@@ -385,7 +359,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       </div>
 
-      {/* NEW SECTION: Withdrawal Status Lifecycle Breakdown */}
+      {/* Withdrawal Status Lifecycle Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
           <div className="flex items-center justify-between mb-6">
@@ -461,158 +435,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       </div>
 
-      {/* Earnings Analytics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
-              <Calendar size={18} className="text-malawi-green" /> Daily Earnings (MWK)
-            </h3>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">Daily Totals</span>
-          </div>
-          <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyEarningsData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                <Tooltip 
-                   cursor={{fill: '#f8fafc'}}
-                   formatter={(value: number) => [`MWK ${value.toLocaleString()}`, 'Total Commissions']}
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                />
-                <Bar dataKey="amount" fill="#118131" radius={[6, 6, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
-              <TrendingUp size={18} className="text-malawi-red" /> Weekly Performance
-            </h3>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">Weekly Trend</span>
-          </div>
-          <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weeklyEarningsData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                <Tooltip 
-                   formatter={(value: number) => [`MWK ${value.toLocaleString()}`, 'Weekly Revenue']}
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#D21034" 
-                  strokeWidth={4} 
-                  dot={{ r: 6, fill: '#D21034', strokeWidth: 2, stroke: '#fff' }} 
-                  activeDot={{ r: 8, strokeWidth: 0 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Payment Distribution Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter">
-              <PieIcon size={18} className="text-malawi-red" /> Payment Distribution
-            </h3>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">By Provider</span>
-          </div>
-          <div className="h-[280px] w-full flex items-center justify-center relative">
-            {methodData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={methodData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={90}
-                    innerRadius={45}
-                    paddingAngle={8}
-                    dataKey="value"
-                    animationDuration={1500}
-                  >
-                    {methodData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={2} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number, name: string, props: any) => [
-                      `${value} requests (${props.payload.percentage}%)`, 
-                      name
-                    ]}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                  />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-gray-400 italic text-sm">Waiting for withdrawal data...</div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold flex items-center gap-2 text-gray-800 uppercase tracking-tighter"><LayoutGrid size={18} className="text-gray-700" /> Channel Insights</h3>
-          </div>
-          <div className="space-y-6 flex flex-col justify-center h-full">
-            <div className="space-y-4">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Request Volume Breakdown</p>
-              {methodData.length > 0 ? methodData.map(method => (
-                <div key={method.name} className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase">
-                    <span>{method.name}</span>
-                    <span>{method.value} Requests ({method.percentage}%)</span>
-                  </div>
-                  <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden border border-gray-200">
-                    <div 
-                      className="h-full rounded-full transition-all duration-700 ease-in-out" 
-                      style={{ 
-                        backgroundColor: method.color, 
-                        width: `${method.percentage}%` 
-                      }}
-                    />
-                  </div>
-                </div>
-              )) : (
-                <p className="text-center text-gray-400 py-8 text-sm italic">No payout data yet</p>
-              )}
-            </div>
-            
-            <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-center border border-dashed border-gray-200 mt-4">
-              <h4 className="text-[10px] font-black text-gray-700 uppercase mb-2">Network Health Note</h4>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                Total earnings tracked across all levels. Airtel Money and TNM Mpamba are currently the only supported payout gateways for KENNETHPOETRYHEALTH affiliates.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Approval Table */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter">Withdrawal Queue</h3>
-          <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold uppercase tracking-tighter border border-yellow-200">
-            {pendingWithdrawals.length} Action Needed
-          </span>
+        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter">Withdrawal Queue</h3>
+            <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold uppercase tracking-tighter border border-yellow-200">
+              {filteredQueue.length} Pending
+            </span>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="bg-white p-2 rounded-lg border border-gray-200 flex items-center gap-2">
+               <Filter size={14} className="text-gray-400" />
+               <input 
+                 type="text" 
+                 placeholder="Filter queue..." 
+                 className="outline-none text-xs w-32 md:w-40"
+                 value={queueSearch}
+                 onChange={(e) => setQueueSearch(e.target.value)}
+               />
+            </div>
+            <button 
+              onClick={() => exportToCSV(pendingWithdrawals, "Pending_Withdrawals")}
+              className="flex items-center gap-2 bg-malawi-green text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
+            >
+              <FileSpreadsheet size={16} /> Export
+            </button>
+          </div>
         </div>
+        
         <div className="overflow-x-auto">
-          {pendingWithdrawals.length === 0 ? (
+          {filteredQueue.length === 0 ? (
             <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-2">
               <CheckCircle className="text-malawi-green" size={32} />
-              <p className="font-medium text-gray-600">Queue Cleared! All requests processed.</p>
+              <p className="font-medium text-gray-600">No matching requests in the queue.</p>
             </div>
           ) : (
             <table className="w-full text-left text-sm">
@@ -627,8 +484,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {pendingWithdrawals.map((w) => (
-                  <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
+                {filteredQueue.map((w) => (
+                  <tr key={w.id} className="hover:bg-gray-50/50 transition-colors animate-in fade-in duration-300">
                     <td className="px-6 py-4">
                       <p className="font-bold text-gray-900">{w.userName}</p>
                       <p className="text-[10px] text-gray-400">ID: {w.userId}</p>
@@ -648,16 +505,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                     <td className="px-6 py-4">
                       {w.proofUrl ? (
                         <div className="flex gap-2 items-center">
-                          <button 
-                            onClick={() => {
-                              setPreviewImage(w.proofUrl!);
-                              setIsZoomed(false);
-                            }}
+                          <Link 
+                            to={`/admin/proof-preview?url=${encodeURIComponent(w.proofUrl || '')}`}
+                            target="_blank"
                             className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 text-xs font-bold underline transition-colors group"
                           >
-                            <ZoomIn size={14} className="group-hover:scale-110 transition-transform" /> 
+                            <ExternalLink size={14} className="group-hover:scale-110 transition-transform" /> 
                             View Proof
-                          </button>
+                          </Link>
                         </div>
                       ) : <span className="text-gray-400 text-xs italic font-medium">No Proof</span>}
                     </td>
@@ -783,42 +638,68 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
       {/* User Management List */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
-          <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter">Affiliate Directory</h3>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">{state.users.length} Active Accounts</p>
+        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/30">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-lg text-gray-800 uppercase tracking-tighter">Affiliate Directory</h3>
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-widest bg-white border border-gray-200 px-2 rounded-full">{filteredUsers.length} Results</p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="bg-white p-2 rounded-lg border border-gray-200 flex items-center gap-2">
+               <Search size={14} className="text-gray-400" />
+               <input 
+                 type="text" 
+                 placeholder="Find user..." 
+                 className="outline-none text-xs w-32 md:w-40"
+                 value={userSearch}
+                 onChange={(e) => setUserSearch(e.target.value)}
+               />
+            </div>
+            <button 
+              onClick={() => exportToCSV(state.users, "Affiliate_Directory")}
+              className="flex items-center gap-2 bg-malawi-black text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-800 transition-colors"
+            >
+              <FileSpreadsheet size={16} /> Export
+            </button>
+          </div>
         </div>
+        
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-[10px]">
-              <tr>
-                <th className="px-6 py-4">Name & Code</th>
-                <th className="px-6 py-4">Access Level</th>
-                <th className="px-6 py-4">Current Wallet</th>
-                <th className="px-6 py-4">Lifetime Yield</th>
-                <th className="px-6 py-4">Onboarding</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {state.users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-gray-900">{u.fullName}</p>
-                    <p className="text-[10px] text-gray-400 font-mono uppercase font-semibold">{u.referralCode}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-tighter ${
-                      u.role === 'ADMIN' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-malawi-green">MWK {u.balance.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-gray-600 font-medium">MWK {u.totalEarnings.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-gray-400 text-xs font-medium">{new Date(u.createdAt).toLocaleDateString()}</td>
+          {filteredUsers.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 italic">No users found matching your search.</div>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="px-6 py-4">Name & Code</th>
+                  <th className="px-6 py-4">Access Level</th>
+                  <th className="px-6 py-4">Current Wallet</th>
+                  <th className="px-6 py-4">Lifetime Yield</th>
+                  <th className="px-6 py-4">Onboarding</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50/50 transition-colors animate-in fade-in duration-300">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-gray-900">{u.fullName}</p>
+                      <p className="text-[10px] text-gray-400 font-mono uppercase font-semibold">{u.referralCode}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-tighter ${
+                        u.role === 'ADMIN' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-malawi-green">MWK {u.balance.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-gray-600 font-medium">MWK {u.totalEarnings.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-gray-400 text-xs font-medium">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
     </div>
