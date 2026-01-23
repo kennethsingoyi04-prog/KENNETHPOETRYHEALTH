@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AppState, User, Referral, MembershipTier, MembershipStatus } from '../types';
 import { LEVEL_1_COMMISSION_PERCENT, LEVEL_2_COMMISSION_PERCENT, SIGNUP_BONUS } from '../constants';
 import Logo from '../components/Logo';
-import { Lock, User as UserIcon, Phone, Smartphone, ChevronRight, AtSign, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Lock, User as UserIcon, Phone, Smartphone, ChevronRight, AtSign, ArrowLeft, Loader2, AlertCircle, ShieldCheck, Key } from 'lucide-react';
 import { notifyNewRegistration } from '../services/NotificationService';
 
 interface AuthProps {
@@ -19,6 +19,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
   const typeParam = searchParams.get('type');
   
   const [isLogin, setIsLogin] = useState(typeParam !== 'signup');
+  const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -30,6 +31,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     whatsapp: '',
     password: '',
     referralCode: searchParams.get('ref') || '',
+    masterKey: '' // Required for admin registration
   });
 
   useEffect(() => {
@@ -43,27 +45,33 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     setIsLoading(true);
     setError(null);
     
-    // Simulate network delay for a more realistic feel
     setTimeout(() => {
       if (isLogin) {
         const identifier = formData.username || formData.email;
         const success = onLogin(identifier, formData.password);
         if (!success) {
-          setError('Invalid login credentials. Please check your username/email and password.');
+          setError('Invalid credentials. Please verify your details.');
           setIsLoading(false);
         } else {
           navigate('/dashboard');
         }
       } else {
+        // Validation for Admin Registration
+        if (isAdminMode && formData.masterKey !== state.systemSettings?.masterKey) {
+          setError('Invalid Master Authorization Key. Contact the system owner.');
+          setIsLoading(false);
+          return;
+        }
+
         const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === formData.username.toLowerCase());
         if (isUsernameTaken) {
-          setError('This username is already taken. Please choose another one.');
+          setError('This username is already taken.');
           setIsLoading(false);
           return;
         }
         finishRegistration();
       }
-    }, 1500);
+    }, 1200);
   };
 
   const finishRegistration = () => {
@@ -81,12 +89,12 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
       password: formData.password,
       referralCode: newUserReferralCode,
       referredBy: referrer?.id,
-      role: 'USER',
-      balance: SIGNUP_BONUS,
+      role: isAdminMode ? 'ADMIN' : 'USER',
+      balance: isAdminMode ? 0 : SIGNUP_BONUS,
       totalEarnings: 0,
       createdAt: new Date().toISOString(),
-      membershipTier: MembershipTier.NONE,
-      membershipStatus: MembershipStatus.INACTIVE,
+      membershipTier: isAdminMode ? MembershipTier.GOLD : MembershipTier.NONE,
+      membershipStatus: isAdminMode ? MembershipStatus.ACTIVE : MembershipStatus.INACTIVE,
       notificationPrefs: {
         emailWithdrawal: true,
         emailReferral: true,
@@ -98,7 +106,8 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     let updatedUsers = [...state.users, newUser];
     let updatedReferrals = [...state.referrals];
 
-    if (referrer) {
+    // Referral logic (only for regular users)
+    if (!isAdminMode && referrer) {
       const l1Commission = (SIGNUP_BONUS * LEVEL_1_COMMISSION_PERCENT) / 100;
       const l1Referral: Referral = {
         id: `r-${Date.now()}-1`,
@@ -147,29 +156,39 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
 
     notifyNewRegistration(newUser.fullName, newUser.email, newUserReferralCode);
     setIsLoading(false);
-    navigate('/activate');
+    navigate(isAdminMode ? '/admin' : '/activate');
   };
 
   return (
     <div className="max-w-md mx-auto py-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      <button 
-        onClick={() => navigate('/')} 
-        disabled={isLoading}
-        className="mb-8 flex items-center gap-2 text-gray-400 hover:text-malawi-black font-black uppercase text-[10px] tracking-widest transition-colors disabled:opacity-50"
-      >
-        <ArrowLeft size={16} /> Back to Home
-      </button>
+      <div className="flex justify-between items-center mb-8">
+        <button 
+          onClick={() => navigate('/')} 
+          disabled={isLoading}
+          className="flex items-center gap-2 text-gray-400 hover:text-malawi-black font-black uppercase text-[10px] tracking-widest transition-colors"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
 
-      <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-malawi-green/5 rounded-full -mr-16 -mt-16"></div>
+        <button 
+          onClick={() => setIsAdminMode(!isAdminMode)}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${isAdminMode ? 'bg-malawi-black text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+        >
+          <ShieldCheck size={14} />
+          {isAdminMode ? 'Admin Headquarters' : 'Member Portal'}
+        </button>
+      </div>
+
+      <div className={`bg-white p-10 rounded-[3rem] shadow-2xl border-t-8 ${isAdminMode ? 'border-malawi-black' : 'border-malawi-green'} relative overflow-hidden transition-all duration-500`}>
+        <div className={`absolute top-0 right-0 w-32 h-32 ${isAdminMode ? 'bg-black/5' : 'bg-malawi-green/5'} rounded-full -mr-16 -mt-16`}></div>
         
         <div className="flex flex-col items-center mb-8">
            <Logo size="lg" className="!text-malawi-black mb-4" />
            <h2 className="text-3xl font-black uppercase tracking-tight text-malawi-black text-center">
-             {isLogin ? 'Member Login' : 'Create Account'}
+             {isLogin ? (isAdminMode ? 'Admin Login' : 'Member Login') : (isAdminMode ? 'Staff Onboarding' : 'Create Account')}
            </h2>
            <p className="text-gray-500 font-medium text-center text-sm mt-2">
-             {isLogin ? 'Sign in to access your dashboard' : 'Join and earn MWK 1,000 bonus on signup'}
+             {isAdminMode ? 'Administrative Control Center' : 'Malawi\'s Premier Affiliate Network'}
            </p>
         </div>
 
@@ -189,7 +208,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
                 <input 
                   type="text" required placeholder="John Phiri"
                   disabled={isLoading}
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
                   value={formData.fullName}
                   onChange={e => setFormData({...formData, fullName: e.target.value})}
                 />
@@ -198,77 +217,59 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           )}
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{isLogin ? 'Username or Email' : 'Desired Username'}</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Handle / Username</label>
             <div className="relative">
               <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input 
                 type="text" required placeholder="johnphiri265"
                 disabled={isLoading}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
                 value={formData.username}
                 onChange={e => setFormData({...formData, username: e.target.value})}
               />
             </div>
           </div>
 
-          {!isLogin && (
-            <>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="tel" required placeholder="+265..."
-                    disabled={isLoading}
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
-                    value={formData.phone}
-                    onChange={e => setFormData({...formData, phone: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Verification</label>
-                <div className="relative">
-                  <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="tel" required placeholder="+265..."
-                    disabled={isLoading}
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
-                    value={formData.whatsapp}
-                    onChange={e => setFormData({...formData, whatsapp: e.target.value})}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Access Password</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Access Secret</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input 
                 type="password" required placeholder="••••••••"
                 disabled={isLoading}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
             </div>
           </div>
 
+          {!isLogin && isAdminMode && (
+            <div className="space-y-1 animate-in slide-in-from-top-2">
+              <label className="text-[10px] font-black text-malawi-red uppercase tracking-widest ml-1">Owner Authorization Key</label>
+              <div className="relative">
+                <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-malawi-red" size={18} />
+                <input 
+                  type="password" required placeholder="KPH-OWNER-XXXX"
+                  disabled={isLoading}
+                  className="w-full pl-12 pr-4 py-4 bg-red-50 border border-red-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-red transition-all text-malawi-red placeholder:text-red-200"
+                  value={formData.masterKey}
+                  onChange={e => setFormData({...formData, masterKey: e.target.value})}
+                />
+              </div>
+            </div>
+          )}
+
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full bg-malawi-black hover:bg-gray-800 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm uppercase tracking-widest disabled:opacity-70 disabled:cursor-not-allowed"
+            className={`w-full ${isAdminMode ? 'bg-malawi-black hover:bg-gray-800' : 'bg-malawi-green hover:bg-green-700'} text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm uppercase tracking-widest disabled:opacity-70`}
           >
             {isLoading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                <span>Processing...</span>
-              </>
+              <Loader2 className="animate-spin" size={20} />
             ) : (
               <>
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+                <span>{isLogin ? 'Grant Access' : 'Establish Record'}</span>
                 <ChevronRight size={20} />
               </>
             )}
@@ -276,13 +277,13 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         </form>
 
         <p className="mt-8 text-center text-gray-500 font-medium">
-          {isLogin ? "Don't have an account yet?" : "Already a member?"}
+          {isLogin ? "No access record yet?" : "Already recognized?"}
           <button 
             onClick={() => { setIsLogin(!isLogin); setError(null); }}
             disabled={isLoading}
-            className="ml-2 font-black text-malawi-red hover:underline uppercase text-xs tracking-wider disabled:opacity-50"
+            className={`ml-2 font-black ${isAdminMode ? 'text-malawi-black' : 'text-malawi-red'} hover:underline uppercase text-xs tracking-wider`}
           >
-            {isLogin ? 'Join Now' : 'Log In'}
+            {isLogin ? (isAdminMode ? 'Request Onboarding' : 'Join Now') : (isAdminMode ? 'Staff Entry' : 'Log In')}
           </button>
         </p>
       </div>

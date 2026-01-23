@@ -13,9 +13,9 @@ import Complaints from './pages/Complaints';
 import Activate from './pages/Activate';
 import ImageLab from './pages/ImageLab';
 import Navbar from './components/Navbar';
-import { User, AppState, MembershipStatus } from './types';
+import { User, AppState, MembershipStatus, MembershipTier } from './types';
 
-const STORAGE_KEY = 'kennethpoetryhealth_state_v2';
+const STORAGE_KEY = 'kennethpoetryhealth_state_v3';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
@@ -24,22 +24,27 @@ const App: React.FC = () => {
     
     return {
       currentUser: null,
+      systemSettings: {
+        masterKey: 'KPH-OWNER-2025',
+        maintenanceMode: false
+      },
       users: [
         {
-          id: 'admin-1',
-          username: 'admin',
-          fullName: 'System Administrator',
-          email: 'admin@kennethpoetryhealth.mw',
-          phone: '+265888123456',
-          whatsapp: '+265888123456',
-          referralCode: 'ADMIN001',
+          id: 'owner-1',
+          username: 'owner',
+          fullName: 'Main Owner',
+          email: 'owner@kennethpoetryhealth.mw',
+          phone: '+265888000000',
+          whatsapp: '+265888000000',
+          referralCode: 'OWNER001',
           role: 'ADMIN',
+          isOwner: true,
           balance: 0,
           totalEarnings: 0,
           createdAt: new Date().toISOString(),
-          password: 'password123',
-          membershipTier: 'GOLD' as any,
-          membershipStatus: 'ACTIVE' as any,
+          password: 'ownerpassword',
+          membershipTier: MembershipTier.GOLD,
+          membershipStatus: MembershipStatus.ACTIVE,
           notificationPrefs: {
             emailWithdrawal: true,
             emailReferral: true,

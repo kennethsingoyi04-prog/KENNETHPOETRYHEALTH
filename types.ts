@@ -45,6 +45,7 @@ export interface User {
   referralCode: string;
   referredBy?: string;
   role: UserRole;
+  isOwner?: boolean; // New: To distinguish the app owner from staff admins
   balance: number;
   totalEarnings: number;
   createdAt: string;
@@ -100,4 +101,8 @@ export interface AppState {
   withdrawals: WithdrawalRequest[];
   referrals: Referral[];
   complaints: Complaint[];
+  systemSettings?: {
+    masterKey: string;
+    maintenanceMode: boolean;
+  };
 }
