@@ -14,6 +14,7 @@ import Activate from './pages/Activate';
 import ImageLab from './pages/ImageLab';
 import Navbar from './components/Navbar';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
+import { syncAppStateToCloud, fetchAppStateFromCloud } from './dataService';
 
 const STORAGE_KEY = 'kennethpoetryhealth_state_v3';
 
@@ -59,8 +60,30 @@ const App: React.FC = () => {
     };
   });
 
+  // Load state from Cloud on initialization
+  useEffect(() => {
+    const initCloud = async () => {
+      const cloudData = await fetchAppStateFromCloud();
+      if (cloudData) {
+        setState(prev => ({
+          ...prev,
+          ...cloudData,
+          currentUser: prev.currentUser // Preserve local session
+        }));
+      }
+    };
+    initCloud();
+  }, []);
+
+  // Sync state to LocalStorage and Cloud on changes
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    
+    const syncTimer = setTimeout(() => {
+      syncAppStateToCloud(state);
+    }, 2000); // Debounce sync to prevent excessive API calls
+    
+    return () => clearTimeout(syncTimer);
   }, [state]);
 
   const login = (identifier: string, password?: string) => {
