@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppState, User, NotificationPreferences, Complaint } from '../types';
-// Removed space from import as per guidelines
 import {GoogleGenAI} from "@google/genai";
 import { 
   User as UserIcon, 
@@ -11,17 +10,11 @@ import {
   Smartphone, 
   Lock, 
   Camera, 
-  Save, 
   CheckCircle,
-  AlertCircle,
   ShieldCheck,
-  Calendar,
-  FileText,
   MapPin,
   AtSign,
-  Bell,
   MessageSquare,
-  Key,
   Sparkles,
   Loader2,
   Trash2,
@@ -30,17 +23,21 @@ import {
   PlusCircle,
   History,
   Settings,
-  ChevronRight
+  ChevronRight,
+  LogOut,
+  // Added AlertCircle to fix the reported error on line 506
+  AlertCircle
 } from 'lucide-react';
 
 interface ProfileProps {
   state: AppState;
   onStateUpdate: (s: Partial<AppState>) => void;
+  onLogout: () => void;
 }
 
 type ProfileTab = 'account' | 'security' | 'support';
 
-const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
+const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate, onLogout }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = state.currentUser!;
   const [activeTab, setActiveTab] = useState<ProfileTab>((searchParams.get('tab') as ProfileTab) || 'account');
@@ -103,14 +100,12 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   const generateAIBio = async () => {
     setIsGeneratingBio(true);
     try {
-      // Re-instantiating AI client right before the call as per guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a senior marketing consultant for the Malawian market. Write a professional, high-converting affiliate bio for a person named ${formData.fullName} located in ${formData.location || 'Malawi'}. The bio should sound trustworthy, energetic, and focus on helping others achieve financial freedom through KENNETHPOETRYHEALTH. Keep it under 150 characters and use Malawian-friendly professional tone. Return ONLY the bio text.`,
       });
       
-      // Accessing text property directly as per guidelines
       if (response.text) {
         setFormData(prev => ({ ...prev, bio: response.text!.trim() }));
       }
@@ -331,6 +326,19 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                    <ChevronRight size={14} />
                 </div>
               </button>
+              
+              <div className="pt-4 mt-4 border-t border-gray-100">
+                 <button 
+                  onClick={() => { if(window.confirm("Are you sure you want to log out?")) onLogout(); }}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-50 text-malawi-red hover:bg-malawi-red hover:text-white transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <LogOut size={18} />
+                    <span className="text-sm font-bold uppercase tracking-tight">Sign Out</span>
+                  </div>
+                  <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -492,6 +500,23 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                 )}
               </div>
             )}
+            
+            {/* Mobile-only Logout Area inside Profile Hub Content */}
+            <div className="md:hidden pt-8 mt-12 border-t border-gray-100">
+               <div className="bg-red-50 p-6 rounded-3xl border border-red-100 text-center space-y-4">
+                 <div className="flex items-center justify-center gap-2 text-malawi-red">
+                    <AlertCircle size={20} />
+                    <h4 className="font-black uppercase tracking-tight text-sm">Danger Zone</h4>
+                 </div>
+                 <p className="text-xs text-gray-500 font-medium">Ready to end your session? You can sign back in at any time.</p>
+                 <button 
+                  onClick={() => { if(window.confirm("Are you sure you want to log out?")) onLogout(); }}
+                  className="w-full bg-malawi-red text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all"
+                >
+                  <LogOut size={20} /> Sign Out Now
+                </button>
+               </div>
+            </div>
           </div>
         </div>
       </div>

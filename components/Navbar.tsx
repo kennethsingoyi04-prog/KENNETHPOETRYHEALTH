@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User, MembershipStatus } from '../types';
+import Logo from './Logo';
 import { 
   LayoutDashboard, 
   Wallet, 
@@ -11,7 +12,8 @@ import {
   User as UserIcon,
   MessageSquareWarning,
   Zap,
-  ChevronRight
+  ChevronRight,
+  ImageIcon
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -25,23 +27,11 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
   const navigate = useNavigate();
   const isInactive = currentUser?.membershipStatus === MembershipStatus.INACTIVE;
 
-  const Logo = () => (
-    <div className="flex items-center gap-2">
-      <img src="/logo.png" alt="KPH Logo" className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
-        // Fallback if image fails to load
-        (e.target as HTMLImageElement).style.display = 'none';
-        (e.target as HTMLImageElement).parentElement!.querySelector('.fallback-logo')!.classList.remove('hidden');
-      }} />
-      <div className="fallback-logo hidden bg-malawi-green text-white w-8 h-8 rounded flex items-center justify-center font-bold">KP</div>
-      <span className="font-black text-xl tracking-tight hidden sm:block">KENNETH<span className="text-malawi-red">POETRYHEALTH</span></span>
-    </div>
-  );
-
   if (!currentUser) return (
     <nav className="bg-white text-malawi-black p-4 border-b border-gray-100 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo />
+        <Link to="/">
+          <Logo variant="dark" />
         </Link>
         <div className="flex items-center gap-4">
            <button 
@@ -95,14 +85,12 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-8">
             <Link to={isInactive ? "/activate" : "/dashboard"}>
-               <div className="flex items-center gap-2">
-                 <img src="/logo.png" alt="KPH Logo" className="w-10 h-10 object-contain" />
-                 <span className="font-black text-xl tracking-tight hidden lg:block">KENNETH<span className="text-malawi-red">POETRYHEALTH</span></span>
-               </div>
+               <Logo size="md" variant="light" />
             </Link>
             
             <div className="flex gap-1">
               <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={isInactive ? Zap : LayoutDashboard} label={isInactive ? "Activate" : "Dashboard"} />
+              <NavItem to="/image-lab" icon={ImageIcon} label="AI Lab" disabled={isInactive} />
               <NavItem to="/withdraw" icon={Wallet} label="Withdraw" disabled={isInactive} />
               <NavItem to="/history" icon={HistoryIcon} label="History" disabled={isInactive} />
               <NavItem 
@@ -143,9 +131,9 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-malawi-black border-t border-gray-800 flex justify-around p-2 z-50 pb-safe">
         <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={isInactive ? Zap : LayoutDashboard} label={isInactive ? "Activate" : "Home"} />
+        <NavItem to="/image-lab" icon={ImageIcon} label="AI Lab" disabled={isInactive} />
         <NavItem to="/withdraw" icon={Wallet} label="Wallet" disabled={isInactive} />
         <NavItem 
           to={currentUser.role === 'ADMIN' ? "/admin" : "/profile?tab=support"} 
@@ -163,14 +151,6 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
           </div>
           <span className="text-[10px] font-medium">Profile</span>
         </Link>
-        {currentUser.role === 'ADMIN' ? (
-          <NavItem to="/admin" icon={ShieldCheck} label="Admin" />
-        ) : (
-          <button onClick={onLogout} className="flex flex-col items-center gap-1 text-gray-400 p-2">
-            <LogOut size={20} />
-            <span className="text-[10px]">Logout</span>
-          </button>
-        )}
       </nav>
     </>
   );

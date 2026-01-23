@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AppState, User, Referral, MembershipTier, MembershipStatus } from '../types';
 import { LEVEL_1_COMMISSION_PERCENT, LEVEL_2_COMMISSION_PERCENT, SIGNUP_BONUS } from '../constants';
+import Logo from '../components/Logo';
 import { Mail, Lock, User as UserIcon, Phone, Smartphone, ChevronRight, AtSign, ArrowLeft } from 'lucide-react';
 import { notifyNewRegistration } from '../services/NotificationService';
 
@@ -44,7 +45,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         navigate('/dashboard');
       }
     } else {
-      // Basic Registration Validation
       const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === formData.username.toLowerCase());
       if (isUsernameTaken) {
         alert('This username is already taken. Please choose another one.');
@@ -86,7 +86,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     let updatedUsers = [...state.users, newUser];
     let updatedReferrals = [...state.referrals];
 
-    // Handle Signup Commissions for Referrer
     if (referrer) {
       const l1Commission = (SIGNUP_BONUS * LEVEL_1_COMMISSION_PERCENT) / 100;
       const l1Referral: Referral = {
@@ -151,7 +150,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-malawi-green/5 rounded-full -mr-16 -mt-16"></div>
         
         <div className="flex flex-col items-center mb-8">
-           <img src="/logo.png" alt="KPH Logo" className="w-24 h-24 object-contain mb-4" />
+           <Logo size="lg" className="!text-malawi-black mb-4" />
            <h2 className="text-3xl font-black uppercase tracking-tight text-malawi-black text-center">
              {isLogin ? 'Member Login' : 'Create Account'}
            </h2>
@@ -187,27 +186,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
             </div>
           </div>
 
-          {!isLogin && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
-                <input 
-                  type="tel" required placeholder="+265..."
-                  className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
-                  onChange={e => setFormData({...formData, phone: e.target.value})}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label>
-                <input 
-                  type="tel" required placeholder="+265..."
-                  className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
-                  onChange={e => setFormData({...formData, whatsapp: e.target.value})}
-                />
-              </div>
-            </div>
-          )}
-
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Access Password</label>
             <div className="relative">
@@ -219,18 +197,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
               />
             </div>
           </div>
-
-          {!isLogin && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referral Code (Optional)</label>
-              <input 
-                type="text" placeholder="REF123"
-                value={formData.referralCode}
-                className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
-                onChange={e => setFormData({...formData, referralCode: e.target.value})}
-              />
-            </div>
-          )}
 
           <button className="w-full bg-malawi-black hover:bg-gray-800 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm uppercase tracking-widest">
             {isLogin ? 'Sign In' : 'Create Account'}

@@ -41,8 +41,10 @@ const History: React.FC<HistoryProps> = ({ state }) => {
       doc.setFont('helvetica', 'bold');
       doc.text('KENNETH', 20, 25);
       
+      // Calculate dynamic position to make it one word
+      const prefixWidth = doc.getTextWidth('KENNETH');
       doc.setTextColor(210, 16, 52); // Malawi Red
-      doc.text('POETRYHEALTH', 63, 25);
+      doc.text('POETRYHEALTH', 20 + prefixWidth, 25);
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);

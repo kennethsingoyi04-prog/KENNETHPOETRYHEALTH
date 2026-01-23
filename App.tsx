@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-// Changed HashRouter to BrowserRouter and ensured clean imports for standard v6 compliance
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -12,17 +11,17 @@ import History from './pages/History';
 import Profile from './pages/Profile';
 import Complaints from './pages/Complaints';
 import Activate from './pages/Activate';
+import ImageLab from './pages/ImageLab';
 import Navbar from './components/Navbar';
 import { User, AppState, MembershipStatus } from './types';
 
-const STORAGE_KEY = 'kennethpoetryhealth_state_v2'; // Bumped version for new schema
+const STORAGE_KEY = 'kennethpoetryhealth_state_v2';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
     
-    // Initial Seed Data
     return {
       currentUser: null,
       users: [
@@ -80,7 +79,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <BrowserRouter>
+    <Router>
       <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
         <Navbar currentUser={state.currentUser} onLogout={logout} complaintsCount={state.complaints.filter(c => c.status === 'PENDING').length} />
         <main className="container mx-auto px-4 py-6">
@@ -122,11 +121,15 @@ const App: React.FC = () => {
             } />
 
             <Route path="/profile" element={
-              state.currentUser ? <Profile state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
+              state.currentUser ? <Profile state={state} onStateUpdate={updateUserState} onLogout={logout} /> : <Navigate to="/auth" />
             } />
 
             <Route path="/complaints" element={
               state.currentUser ? <Complaints state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
+            } />
+
+            <Route path="/image-lab" element={
+              state.currentUser ? <ImageLab /> : <Navigate to="/auth" />
             } />
 
             <Route path="/admin" element={
@@ -139,7 +142,7 @@ const App: React.FC = () => {
           </Routes>
         </main>
       </div>
-    </BrowserRouter>
+    </Router>
   );
 };
 
