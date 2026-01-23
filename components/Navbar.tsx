@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User, MembershipStatus } from '../types';
 import { 
   LayoutDashboard, 
@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   User as UserIcon,
   MessageSquareWarning,
-  Zap
+  Zap,
+  ChevronRight
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -21,15 +22,41 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount = 0 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isInactive = currentUser?.membershipStatus === MembershipStatus.INACTIVE;
 
+  const Logo = () => (
+    <div className="flex items-center gap-2">
+      <img src="/logo.png" alt="KPH Logo" className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
+        // Fallback if image fails to load
+        (e.target as HTMLImageElement).style.display = 'none';
+        (e.target as HTMLImageElement).parentElement!.querySelector('.fallback-logo')!.classList.remove('hidden');
+      }} />
+      <div className="fallback-logo hidden bg-malawi-green text-white w-8 h-8 rounded flex items-center justify-center font-bold">KP</div>
+      <span className="font-black text-xl tracking-tight hidden sm:block">KENNETH<span className="text-malawi-red">POETRYHEALTH</span></span>
+    </div>
+  );
+
   if (!currentUser) return (
-    <nav className="bg-malawi-black text-white p-4 shadow-lg border-b-4 border-malawi-red">
+    <nav className="bg-white text-malawi-black p-4 border-b border-gray-100 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <span className="bg-malawi-green p-1 rounded">KP</span>
-          <span>KENNETH<span className="text-malawi-red">POETRYHEALTH</span></span>
+        <Link to="/" className="flex items-center gap-2">
+          <Logo />
         </Link>
+        <div className="flex items-center gap-4">
+           <button 
+             onClick={() => navigate('/auth?type=login')} 
+             className="text-xs font-black uppercase tracking-widest hover:text-malawi-green transition-colors"
+           >
+             Login
+           </button>
+           <button 
+             onClick={() => navigate('/auth?type=signup')} 
+             className="bg-malawi-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-gray-800 transition-all flex items-center gap-2"
+           >
+             Join Now <ChevronRight size={14} />
+           </button>
+        </div>
       </div>
     </nav>
   );
@@ -67,12 +94,14 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
       <nav className="bg-malawi-black text-white p-4 shadow-lg sticky top-0 z-50 border-b-4 border-malawi-red hidden md:block">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-8">
-            <Link to={isInactive ? "/activate" : "/dashboard"} className="flex items-center gap-2 font-bold text-xl">
-              <span className="bg-malawi-green p-1 rounded">KP</span>
-              <span>KENNETH<span className="text-malawi-red">POETRYHEALTH</span></span>
+            <Link to={isInactive ? "/activate" : "/dashboard"}>
+               <div className="flex items-center gap-2">
+                 <img src="/logo.png" alt="KPH Logo" className="w-10 h-10 object-contain" />
+                 <span className="font-black text-xl tracking-tight hidden lg:block">KENNETH<span className="text-malawi-red">POETRYHEALTH</span></span>
+               </div>
             </Link>
             
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={isInactive ? Zap : LayoutDashboard} label={isInactive ? "Activate" : "Dashboard"} />
               <NavItem to="/withdraw" icon={Wallet} label="Withdraw" disabled={isInactive} />
               <NavItem to="/history" icon={HistoryIcon} label="History" disabled={isInactive} />

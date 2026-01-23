@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 // Changed HashRouter to BrowserRouter and ensured clean imports for standard v6 compliance
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
@@ -84,6 +85,14 @@ const App: React.FC = () => {
         <Navbar currentUser={state.currentUser} onLogout={logout} complaintsCount={state.complaints.filter(c => c.status === 'PENDING').length} />
         <main className="container mx-auto px-4 py-6">
           <Routes>
+            <Route path="/" element={
+              state.currentUser ? (
+                state.currentUser.membershipStatus === MembershipStatus.INACTIVE 
+                  ? <Navigate to="/activate" /> 
+                  : <Navigate to="/dashboard" />
+              ) : <Landing />
+            } />
+
             <Route path="/auth" element={
               state.currentUser ? (
                 state.currentUser.membershipStatus === MembershipStatus.INACTIVE 
@@ -127,8 +136,6 @@ const App: React.FC = () => {
             <Route path="/admin/proof-preview" element={
               state.currentUser?.role === 'ADMIN' ? <ProofPreview /> : <Navigate to="/auth" />
             } />
-
-            <Route path="/" element={<Navigate to="/auth" />} />
           </Routes>
         </main>
       </div>
