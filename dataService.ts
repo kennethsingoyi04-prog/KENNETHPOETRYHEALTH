@@ -3,71 +3,63 @@ import { supabase } from './supabaseClient';
 import { AppState } from './types';
 
 /**
- * Inserts a single record into a Supabase table.
- * Example: await insertRecord('users', { name: 'John' });
+ * Robust check to see if the cloud is accessible.
  */
-export const insertRecord = async (table: string, data: any) => {
-  const { data: result, error } = await supabase
-    .from(table)
-    .insert(data)
-    .select();
-  
-  if (error) {
-    console.error(`Supabase Insert Error [${table}]:`, error.message);
-    return { success: false, error };
+export const checkCloudHealth = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('system_data').select('id').limit(1);
+    return !error;
+  } catch {
+    return false;
   }
-  return { success: true, data: result };
 };
 
 /**
- * Reads records from a Supabase table.
- * Example: await readRecords('withdrawals');
- */
-export const readRecords = async (table: string, query = '*') => {
-  const { data, error } = await supabase
-    .from(table)
-    .select(query);
-  
-  if (error) {
-    console.error(`Supabase Read Error [${table}]:`, error.message);
-    return { success: false, error };
-  }
-  return { success: true, data };
-};
-
-/**
- * Syncs the entire application state (excluding currentUser) to a global storage table.
- * This ensures the affiliate system persists across different browsers/devices.
- * 
- * REQUIRED TABLE SETUP:
- * Create a table 'system_data' with:
- * - id: text (primary key)
- * - payload: jsonb
+ * Syncs the local state to Supabase securely.
+ * This function now fails silently if the table doesn't exist.
  */
 export const syncAppStateToCloud = async (state: AppState) => {
+  // 1. NEVER sync the 'currentUser' to the global state. 
+  // Session is private to the device.
   const { currentUser, ...persistentData } = state;
   
-  const { error } = await supabase
-    .from('system_data')
-    .upsert({ id: 'kph_global_state', payload: persistentData });
+  // 2. Prevent syncing empty data over existing cloud data
+  if (state.users.length <= 1 && !state.users.some(u => !u.isOwner)) {
+    return;
+  }
 
-  if (error) {
-    console.warn('Sync to Supabase failed. Ensure a table "system_data" exists with columns "id" (text) and "payload" (jsonb).', error.message);
+  try {
+    const { error } = await supabase
+      .from('system_data')
+      .upsert({ 
+        id: 'kph_global_state', 
+        payload: persistentData,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Sync failed (Table may be missing or RLS is ON):', error.message);
+    }
+  } catch (err) {
+    // Background sync failure should not interrupt the user
   }
 };
 
 /**
- * Fetches the global application state from Supabase.
+ * Fetches cloud data without breaking the local session.
  */
 export const fetchAppStateFromCloud = async (): Promise<Partial<AppState> | null> => {
-  const { data, error } = await supabase
-    .from('system_data')
-    .select('payload')
-    .eq('id', 'kph_global_state')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('system_data')
+      .select('payload')
+      .eq('id', 'kph_global_state')
+      .maybeSingle();
 
-  if (error) {
+    if (error) throw error;
+    return data?.payload as Partial<AppState> || null;
+  } catch (err: any) {
+    console.warn("Cloud fetch skipped:", err.message);
     return null;
   }
-  return data.payload as Partial<AppState>;
 };
