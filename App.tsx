@@ -10,8 +10,9 @@ import Withdraw from './pages/Withdraw';
 import History from './pages/History';
 import Profile from './pages/Profile';
 import Complaints from './pages/Complaints';
+import Activate from './pages/Activate';
 import Navbar from './components/Navbar';
-import { User, AppState, UserRole } from './types';
+import { User, AppState, MembershipStatus } from './types';
 
 const STORAGE_KEY = 'kennethpoetryhealth_state_v2'; // Bumped version for new schema
 
@@ -84,11 +85,23 @@ const App: React.FC = () => {
         <main className="container mx-auto px-4 py-6">
           <Routes>
             <Route path="/auth" element={
-              state.currentUser ? <Navigate to="/dashboard" /> : <Auth state={state} onLogin={login} onStateUpdate={updateUserState} />
+              state.currentUser ? (
+                state.currentUser.membershipStatus === MembershipStatus.INACTIVE 
+                  ? <Navigate to="/activate" /> 
+                  : <Navigate to="/dashboard" />
+              ) : <Auth state={state} onLogin={login} onStateUpdate={updateUserState} />
             } />
             
+            <Route path="/activate" element={
+              state.currentUser ? <Activate state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
+            } />
+
             <Route path="/dashboard" element={
-              state.currentUser ? <Dashboard state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
+              state.currentUser ? (
+                state.currentUser.membershipStatus === MembershipStatus.INACTIVE 
+                  ? <Navigate to="/activate" /> 
+                  : <Dashboard state={state} onStateUpdate={updateUserState} />
+              ) : <Navigate to="/auth" />
             } />
 
             <Route path="/withdraw" element={
