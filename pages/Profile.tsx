@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppState, User, NotificationPreferences, Complaint } from '../types';
-import { GoogleGenAI } from "@google/genai";
+// Removed space from import as per guidelines
+import {GoogleGenAI} from "@google/genai";
 import { 
   User as UserIcon, 
   Mail, 
@@ -102,14 +103,16 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   const generateAIBio = async () => {
     setIsGeneratingBio(true);
     try {
+      // Re-instantiating AI client right before the call as per guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a senior marketing consultant for the Malawian market. Write a professional, high-converting affiliate bio for a person named ${formData.fullName} located in ${formData.location || 'Malawi'}. The bio should sound trustworthy, energetic, and focus on helping others achieve financial freedom through KENNETHPOETRYHEALTH. Keep it under 150 characters and use Malawian-friendly professional tone. Return ONLY the bio text.`,
       });
       
+      // Accessing text property directly as per guidelines
       if (response.text) {
-        setFormData(prev => ({ ...prev, bio: response.text.trim() }));
+        setFormData(prev => ({ ...prev, bio: response.text!.trim() }));
       }
     } catch (err) {
       console.error("AI Generation failed", err);

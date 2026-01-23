@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { AppState, MembershipStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
-import { GoogleGenAI } from "@google/genai";
+// Removed space from import as per guidelines
+import {GoogleGenAI} from "@google/genai";
 import { 
   Users, 
   TrendingUp, 
@@ -55,13 +56,15 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
     setAiResponse(null);
     
     try {
+      // Re-instantiating AI client right before the call as per guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as an expert affiliate marketing mentor specializing in the Malawi market (Blantyre, Lilongwe, Mzuzu, etc.). A user is asking: "${aiPrompt}". Provide specific, actionable advice for the KENNETHPOETRYHEALTH platform. Mention local tactics like using WhatsApp statuses, community gatherings, or local market networking. Keep the response concise and encouraging.`,
       });
       
-      setAiResponse(response.text);
+      // Accessing text property directly as per guidelines
+      setAiResponse(response.text || "I'm sorry, I couldn't generate a response at this time.");
     } catch (err) {
       console.error("AI Marketing Assistant failed", err);
       setAiResponse("I'm having a bit of trouble connecting to the network. Please try again later!");
@@ -110,15 +113,15 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
              <div>
                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Membership Pending Approval</h3>
                <p className="text-sm text-gray-500 max-w-lg">
-                 Our administrators are reviewing your payment proof.
+                 Our administrators are reviewing your payment proof. You can join our community for updates.
                </p>
              </div>
            </div>
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <a href="#" className="flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all active:scale-95">
+              <a href="https://chat.whatsapp.com/KHyBJz9bNq07QngjuP83Vx" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all active:scale-95">
                 <MessageSquare size={16} /> WhatsApp Group
               </a>
-              <a href="#" className="flex items-center justify-center gap-2 bg-malawi-black text-white py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all active:scale-95">
+              <a href="https://www.kennethpoetryhealth.com/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-malawi-black text-white py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all active:scale-95">
                 <ExternalLink size={16} /> Official Website
               </a>
            </div>

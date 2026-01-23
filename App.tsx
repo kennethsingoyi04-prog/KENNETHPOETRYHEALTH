@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+// Changed HashRouter to BrowserRouter and ensured clean imports for standard v6 compliance
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
@@ -36,8 +37,8 @@ const App: React.FC = () => {
           totalEarnings: 0,
           createdAt: new Date().toISOString(),
           password: 'password123',
-          membershipTier: 'GOLD',
-          membershipStatus: 'ACTIVE',
+          membershipTier: 'GOLD' as any,
+          membershipStatus: 'ACTIVE' as any,
           notificationPrefs: {
             emailWithdrawal: true,
             emailReferral: true,
@@ -77,7 +78,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
         <Navbar currentUser={state.currentUser} onLogout={logout} complaintsCount={state.complaints.filter(c => c.status === 'PENDING').length} />
         <main className="container mx-auto px-4 py-6">
@@ -118,7 +119,7 @@ const App: React.FC = () => {
           </Routes>
         </main>
       </div>
-    </HashRouter>
+    </BrowserRouter>
   );
 };
 

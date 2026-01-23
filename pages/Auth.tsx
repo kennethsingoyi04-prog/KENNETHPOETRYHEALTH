@@ -323,7 +323,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <a 
-                      href="https://wa.me/265888123456" 
+                      href="https://chat.whatsapp.com/KHyBJz9bNq07QngjuP83Vx" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#1ebd59] transition-all shadow-md active:scale-95"
@@ -331,7 +331,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
                        <MessageSquare size={16} /> Official WhatsApp
                     </a>
                     <a 
-                      href="https://kennethpoetryhealth.mw/payments" 
+                      href="https://www.kennethpoetryhealth.com/" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 bg-malawi-black text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all shadow-md active:scale-95"
