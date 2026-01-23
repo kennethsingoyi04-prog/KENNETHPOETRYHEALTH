@@ -27,7 +27,10 @@ import {
   Crown,
   UserPlus,
   Settings,
-  AlertTriangle
+  AlertTriangle,
+  Calendar,
+  RotateCcw,
+  DollarSign
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -39,53 +42,96 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const currentUser = state.currentUser!;
   const isOwner = currentUser.isOwner === true;
   
-  const [userSearch, setUserSearch] = useState("");
-  const [queueSearch, setQueueSearch] = useState("");
   const [tab, setTab] = useState<'withdrawals' | 'memberships' | 'complaints' | 'team' | 'users'>('withdrawals');
   
+  // Advanced Filter State
+  const [searchText, setSearchText] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+
+  // Reset Filters
+  const resetFilters = () => {
+    setSearchText("");
+    setStartDate("");
+    setEndDate("");
+    setStatusFilter("ALL");
+    setMinAmount("");
+    setMaxAmount("");
+  };
+
   // Modals
   const [replyTicket, setReplyTicket] = useState<Complaint | null>(null);
   const [adminReply, setAdminReply] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
 
-  // Stats
-  const totalUsers = state.users.filter(u => u.role === 'USER').length;
+  // Stats (calculated from raw state)
+  const totalUsersCount = state.users.filter(u => u.role === 'USER').length;
   const staffAdmins = state.users.filter(u => u.role === 'ADMIN' && !u.isOwner);
   const totalBalance = state.users.filter(u => u.role === 'USER').reduce((acc, u) => acc + u.balance, 0);
-  const pendingWithdrawals = state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING);
-  const pendingMemberships = state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING);
-  const pendingComplaints = state.complaints.filter(c => c.status === 'PENDING');
-  
   const totalPayouts = state.withdrawals
     .filter(w => w.status === WithdrawalStatus.APPROVED)
     .reduce((acc, w) => acc + w.amount, 0);
 
-  const withdrawalMethodData = useMemo(() => {
-    const stats: Record<string, number> = state.withdrawals.reduce((acc, w) => {
-      acc[w.paymentMethod] = (acc[w.paymentMethod] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    const total = (Object.values(stats) as number[]).reduce((sum: number, val: number) => sum + val, 0);
-    
-    return Object.entries(stats).map(([name, value]) => ({
-      name,
-      value: value as number,
-      percentage: (total as number) > 0 ? (((value as number) / (total as number)) * 100).toFixed(1) : "0"
-    }));
-  }, [state.withdrawals]);
-
-  const COLORS = {
-    [PaymentMethod.AIRTEL_MONEY]: MALAWI_COLORS.red,
-    [PaymentMethod.TNM_MPAMBA]: MALAWI_COLORS.green
+  // Filter Logic Helper
+  const dateInRange = (dateStr: string) => {
+    if (!startDate && !endDate) return true;
+    const date = new Date(dateStr).getTime();
+    const start = startDate ? new Date(startDate).getTime() : -Infinity;
+    const end = endDate ? new Date(endDate).getTime() : Infinity;
+    return date >= start && date <= end;
   };
+
+  // Filtered Lists
+  const filteredWithdrawals = useMemo(() => {
+    return state.withdrawals.filter(w => {
+      const matchesSearch = w.userName.toLowerCase().includes(searchText.toLowerCase()) || w.phone.includes(searchText);
+      const matchesStatus = statusFilter === "ALL" || w.status === statusFilter;
+      const matchesMin = minAmount === "" || w.amount >= parseFloat(minAmount);
+      const matchesMax = maxAmount === "" || w.amount <= parseFloat(maxAmount);
+      return matchesSearch && matchesStatus && matchesMin && matchesMax && dateInRange(w.createdAt);
+    });
+  }, [state.withdrawals, searchText, statusFilter, minAmount, maxAmount, startDate, endDate]);
+
+  const filteredMemberships = useMemo(() => {
+    return state.users.filter(u => {
+      const isPending = u.membershipStatus === MembershipStatus.PENDING;
+      const matchesSearch = u.fullName.toLowerCase().includes(searchText.toLowerCase()) || u.username.toLowerCase().includes(searchText.toLowerCase());
+      return isPending && matchesSearch && dateInRange(u.createdAt);
+    });
+  }, [state.users, searchText, startDate, endDate]);
+
+  const filteredComplaints = useMemo(() => {
+    return state.complaints.filter(c => {
+      const matchesSearch = c.userName.toLowerCase().includes(searchText.toLowerCase()) || c.subject.toLowerCase().includes(searchText.toLowerCase());
+      const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
+      return matchesSearch && matchesStatus && dateInRange(c.createdAt);
+    });
+  }, [state.complaints, searchText, statusFilter, startDate, endDate]);
+
+  const filteredUsers = useMemo(() => {
+    return state.users.filter(u => {
+      if (u.role !== 'USER') return false;
+      const matchesSearch = u.fullName.toLowerCase().includes(searchText.toLowerCase()) || u.username.toLowerCase().includes(searchText.toLowerCase());
+      const matchesStatus = statusFilter === "ALL" || u.membershipStatus === statusFilter;
+      return matchesSearch && matchesStatus && dateInRange(u.createdAt);
+    });
+  }, [state.users, searchText, statusFilter, startDate, endDate]);
+
+  const filteredStaff = useMemo(() => {
+    return staffAdmins.filter(u => {
+      const matchesSearch = u.fullName.toLowerCase().includes(searchText.toLowerCase()) || u.username.toLowerCase().includes(searchText.toLowerCase());
+      return matchesSearch;
+    });
+  }, [staffAdmins, searchText]);
 
   const handleWithdrawalAction = (id: string, status: WithdrawalStatus) => {
     const updatedWithdrawals = state.withdrawals.map(w => 
       w.id === id ? { ...w, status } : w
     );
     onStateUpdate({ withdrawals: updatedWithdrawals });
-    alert(`Withdrawal ${status.toLowerCase()} successfully.`);
   };
 
   const handleMembershipAction = (userId: string, status: MembershipStatus) => {
@@ -96,7 +142,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         let updatedUsers = [...state.users];
         let newReferrals = [...state.referrals];
 
-        // Direct Referrer (L1)
         if (userToActivate.referredBy) {
           const l1Referrer = updatedUsers.find(u => u.id === userToActivate.referredBy);
           if (l1Referrer) {
@@ -119,7 +164,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
               timestamp: new Date().toISOString()
             });
 
-            // Indirect Referrer (L2) - 5% Fixed
             if (l1Referrer.referredBy) {
               const l2Referrer = updatedUsers.find(u => u.id === l1Referrer.referredBy);
               if (l2Referrer) {
@@ -173,7 +217,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   };
 
   const handleRemoveStaff = (id: string) => {
-    if (!window.confirm("Are you sure you want to revoke this staff member's administrative privileges?")) return;
+    if (!window.confirm("Revoke admin privileges?")) return;
     const updatedUsers = state.users.map(u => u.id === id ? { ...u, role: 'USER' as UserRole } : u);
     onStateUpdate({ users: updatedUsers });
   };
@@ -185,7 +229,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* Reply Modal */}
       {replyTicket && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
@@ -228,62 +272,143 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
         
         <div className="flex gap-2">
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
-            <Search size={18} className="text-gray-400" />
-            <input type="text" placeholder="Lookup affiliate..." className="outline-none text-sm w-48" value={queueSearch} onChange={(e) => setQueueSearch(e.target.value)} />
-          </div>
           {isOwner && (
-            <button className="bg-malawi-black text-white p-3 rounded-xl shadow-md hover:bg-gray-800 transition-all">
+            <button className="bg-white border border-gray-200 text-gray-700 p-3 rounded-xl shadow-sm hover:bg-gray-50 transition-all">
               <Settings size={20} />
             </button>
           )}
         </div>
       </header>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 group hover:shadow-xl transition-all">
-          <div className="flex justify-between items-start mb-4">
-             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={20} /></div>
-             {isOwner && <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Platform-wide</span>}
+      {/* Filter Section */}
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-malawi-black font-black uppercase tracking-widest text-xs">
+            <Filter size={16} className="text-malawi-red" />
+            System Filters
           </div>
-          <p className="text-gray-500 text-xs font-bold uppercase mb-1">Total Members</p>
-          <p className="text-3xl font-black text-malawi-black">{totalUsers}</p>
+          <button 
+            onClick={resetFilters}
+            className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-malawi-red transition-colors flex items-center gap-1.5"
+          >
+            <RotateCcw size={12} /> Clear All Filters
+          </button>
         </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 group hover:shadow-xl transition-all">
-          <div className="flex justify-between items-start mb-4">
-             <div className="p-2 bg-red-50 text-malawi-red rounded-lg"><Wallet size={20} /></div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Search Keywords</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input 
+                type="text" 
+                placeholder="Search name, phone, email..." 
+                className="w-full pl-9 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-malawi-green text-xs font-medium"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
           </div>
-          <p className="text-gray-500 text-xs font-bold uppercase mb-1">User Escrow</p>
-          <p className="text-3xl font-black text-malawi-red">MWK {totalBalance.toLocaleString()}</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 group hover:shadow-xl transition-all">
-          <div className="flex justify-between items-start mb-4">
-             <div className="p-2 bg-green-50 text-malawi-green rounded-lg"><Activity size={20} /></div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Date Range</label>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+                <input 
+                  type="date" 
+                  className="w-full pl-8 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-[10px] font-bold"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <span className="text-gray-300">to</span>
+              <div className="relative flex-1">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+                <input 
+                  type="date" 
+                  className="w-full pl-8 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-[10px] font-bold"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
-          <p className="text-gray-500 text-xs font-bold uppercase mb-1">Total Payouts</p>
-          <p className="text-3xl font-black text-malawi-green">MWK {totalPayouts.toLocaleString()}</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 group hover:shadow-xl transition-all">
-          <div className="flex justify-between items-start mb-4">
-             <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><AlertTriangle size={20} /></div>
-          </div>
-          <p className="text-gray-500 text-xs font-bold uppercase mb-1">Action Needed</p>
-          <p className="text-3xl font-black text-malawi-black">{pendingWithdrawals.length + pendingMemberships.length + pendingComplaints.length}</p>
+
+          {(tab === 'withdrawals' || tab === 'users' || tab === 'complaints') && (
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Status Classification</label>
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-[10px] font-black uppercase tracking-wider"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="ALL">All Statuses</option>
+                {tab === 'withdrawals' && (
+                  <>
+                    <option value={WithdrawalStatus.PENDING}>Pending Only</option>
+                    <option value={WithdrawalStatus.APPROVED}>Approved Only</option>
+                    <option value={WithdrawalStatus.REJECTED}>Rejected Only</option>
+                  </>
+                )}
+                {tab === 'users' && (
+                  <>
+                    <option value={MembershipStatus.ACTIVE}>Active Members</option>
+                    <option value={MembershipStatus.INACTIVE}>Inactive Members</option>
+                    <option value={MembershipStatus.PENDING}>Review Pending</option>
+                  </>
+                )}
+                {tab === 'complaints' && (
+                  <>
+                    <option value="PENDING">Open Tickets</option>
+                    <option value="RESOLVED">Resolved Tickets</option>
+                  </>
+                )}
+              </select>
+            </div>
+          )}
+
+          {tab === 'withdrawals' && (
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Amount Threshold (MWK)</label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+                  <input 
+                    type="number" 
+                    placeholder="Min" 
+                    className="w-full pl-8 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-[10px] font-bold"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+                  <input 
+                    type="number" 
+                    placeholder="Max" 
+                    className="w-full pl-8 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-[10px] font-bold"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="flex border-b border-gray-200 gap-8 overflow-x-auto pb-px">
         {[
-          { id: 'withdrawals', label: 'Payouts', count: pendingWithdrawals.length },
-          { id: 'memberships', label: 'Memberships', count: pendingMemberships.length },
-          { id: 'complaints', label: 'Tickets', count: pendingComplaints.length },
+          { id: 'withdrawals', label: 'Payouts', count: state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING).length },
+          { id: 'memberships', label: 'Memberships', count: state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING).length },
+          { id: 'complaints', label: 'Tickets', count: state.complaints.filter(c => c.status === 'PENDING').length },
           { id: 'users', label: 'User Directory', count: 0 },
           { id: 'team', label: 'Staff Team', count: staffAdmins.length, restricted: !isOwner }
         ].filter(t => !t.restricted).map((t) => (
           <button 
             key={t.id}
-            onClick={() => setTab(t.id as any)}
+            onClick={() => { setTab(t.id as any); setStatusFilter("ALL"); }}
             className={`pb-4 font-black uppercase tracking-widest text-xs transition-all border-b-2 whitespace-nowrap flex items-center gap-2 ${tab === t.id ? 'border-malawi-red text-malawi-red' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
             {t.label} {t.count > 0 && <span className={`px-2 py-0.5 rounded-full text-[9px] ${tab === t.id ? 'bg-malawi-red text-white' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span>}
@@ -291,92 +416,104 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         ))}
       </div>
 
-      <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px]">
         {tab === 'withdrawals' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
-                <tr><th className="px-6 py-4">User Details</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Method</th><th className="px-6 py-4">ID Verification</th><th className="px-6 py-4 text-center">Actions</th></tr>
+                <tr><th className="px-6 py-4">User Details</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Method</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-center">Actions</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {pendingWithdrawals.map(w => (
+                {filteredWithdrawals.map(w => (
                   <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4"><p className="font-bold">{w.userName}</p><p className="text-[10px] text-gray-400">@{w.phone}</p></td>
+                    <td className="px-6 py-4">
+                      <p className="font-bold">{w.userName}</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">+{w.phone}</p>
+                      <p className="text-[9px] text-gray-300 mt-0.5">{new Date(w.createdAt).toLocaleString()}</p>
+                    </td>
                     <td className="px-6 py-4 font-black text-malawi-red">MWK {w.amount.toLocaleString()}</td>
                     <td className="px-6 py-4 uppercase font-bold text-[10px]">{w.paymentMethod}</td>
                     <td className="px-6 py-4">
-                      {w.proofUrl ? (
-                        <Link to={`/admin/proof-preview?url=${encodeURIComponent(w.proofUrl)}`} target="_blank" className="text-blue-600 font-bold flex items-center gap-1 hover:underline">
-                           <ImageIcon size={14} /> Preview
-                        </Link>
-                      ) : '-'}
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                        w.status === WithdrawalStatus.APPROVED ? 'bg-green-50 text-green-700' : 
+                        w.status === WithdrawalStatus.PENDING ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'
+                      }`}>
+                        {w.status}
+                      </span>
                     </td>
                     <td className="px-6 py-4 flex gap-2 justify-center">
-                      <button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.APPROVED)} className="bg-malawi-green text-white p-2 rounded-lg hover:bg-green-700 transition-all"><Check size={16} /></button>
-                      <button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.REJECTED)} className="bg-malawi-red text-white p-2 rounded-lg hover:bg-red-700 transition-all"><X size={16} /></button>
+                      {w.status === WithdrawalStatus.PENDING && (
+                        <>
+                          <button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.APPROVED)} className="bg-malawi-green text-white p-2 rounded-lg hover:bg-green-700 transition-all"><Check size={16} /></button>
+                          <button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.REJECTED)} className="bg-malawi-red text-white p-2 rounded-lg hover:bg-red-700 transition-all"><X size={16} /></button>
+                        </>
+                      )}
+                      {w.proofUrl && (
+                        <Link to={`/admin/proof-preview?url=${encodeURIComponent(w.proofUrl)}`} target="_blank" className="bg-gray-100 text-gray-600 p-2 rounded-lg hover:bg-gray-200 transition-all">
+                          <ImageIcon size={16} />
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}
+                {filteredWithdrawals.length === 0 && (
+                  <tr><td colSpan={5} className="p-12 text-center text-gray-400 font-bold uppercase tracking-widest text-[10px]">No payout records match these filters</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
 
-        {tab === 'team' && isOwner && (
-          <div className="p-8 space-y-8 animate-in slide-in-from-right-4">
-             <div className="flex justify-between items-center">
-               <div>
-                 <h3 className="text-xl font-black uppercase tracking-tight">Staff Governance</h3>
-                 <p className="text-sm text-gray-500">Manage administrative roles and monitoring</p>
-               </div>
-               <button className="bg-malawi-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all">
-                  <UserPlus size={16} /> Appoint Staff
-               </button>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-malawi-black text-white p-6 rounded-[2rem] border-b-4 border-malawi-red shadow-xl">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-malawi-red">
-                       <Crown size={24} />
-                    </div>
-                    <div>
-                      <p className="font-black uppercase tracking-tight">{currentUser.fullName}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Platform Owner</p>
-                    </div>
-                  </div>
-                  <div className="text-[10px] font-medium text-gray-400 leading-relaxed italic">
-                    "You have absolute system authority. Your actions override all staff decisions."
-                  </div>
-                </div>
-
-                {staffAdmins.map(admin => (
-                  <div key={admin.id} className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm hover:shadow-xl transition-all relative group">
-                    <button 
-                      onClick={() => handleRemoveStaff(admin.id)}
-                      className="absolute top-4 right-4 text-gray-300 hover:text-malawi-red transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
-                    <div className="flex items-center gap-4 mb-4">
-                       <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400">
-                          <ShieldCheck size={24} />
-                       </div>
-                       <div>
-                          <p className="font-black uppercase tracking-tight">{admin.fullName}</p>
-                          <p className="text-[9px] font-bold text-malawi-green uppercase tracking-widest">Active Staff</p>
-                       </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                       <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Access Key</span>
-                          <span className="text-xs font-mono font-bold">STAFF-{admin.id.slice(-4).toUpperCase()}</span>
-                       </div>
-                       <button className="text-[9px] font-black uppercase text-blue-600 hover:underline">Monitor Logs</button>
-                    </div>
-                  </div>
+        {tab === 'memberships' && (
+          <div className="overflow-x-auto">
+             <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
+                <tr><th className="px-6 py-4">Affiliate</th><th className="px-6 py-4">Target Tier</th><th className="px-6 py-4">Applied On</th><th className="px-6 py-4 text-center">Authorization</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredMemberships.map(m => (
+                  <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4"><p className="font-bold">{m.fullName}</p><p className="text-[10px] text-gray-400">@{m.username}</p></td>
+                    <td className="px-6 py-4 font-black tracking-tight">{m.membershipTier}</td>
+                    <td className="px-6 py-4 text-gray-500 text-xs">{new Date(m.createdAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 flex gap-2 justify-center">
+                      <button onClick={() => handleMembershipAction(m.id, MembershipStatus.ACTIVE)} className="bg-malawi-green text-white px-4 py-2 rounded-xl text-xs font-black uppercase hover:bg-green-700 active:scale-95 transition-all">Verify</button>
+                      <button onClick={() => handleMembershipAction(m.id, MembershipStatus.INACTIVE)} className="bg-malawi-red text-white px-4 py-2 rounded-xl text-xs font-black uppercase hover:bg-red-700 active:scale-95 transition-all">Decline</button>
+                      {m.membershipProofUrl && (
+                        <Link to={`/admin/proof-preview?url=${encodeURIComponent(m.membershipProofUrl)}`} target="_blank" className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-100 transition-all">Slip</Link>
+                      )}
+                    </td>
+                  </tr>
                 ))}
-             </div>
+                {filteredMemberships.length === 0 && (
+                  <tr><td colSpan={4} className="p-12 text-center text-gray-400 font-bold uppercase tracking-widest text-[10px]">No pending membership applications match criteria</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === 'complaints' && (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+             {filteredComplaints.map(c => (
+               <div key={c.id} className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm hover:shadow-xl transition-all flex flex-col justify-between group">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${c.status === 'PENDING' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{c.status}</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{c.userName}</span>
+                      </div>
+                      <span className="text-[9px] text-gray-300 font-bold">{new Date(c.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <h4 className="font-black text-malawi-black uppercase tracking-tight mb-2 group-hover:text-malawi-red transition-colors">{c.subject}</h4>
+                    <p className="text-xs text-gray-500 italic mb-6 leading-relaxed line-clamp-2">"{c.message}"</p>
+                  </div>
+                  <button onClick={() => setReplyTicket(c)} className="w-full bg-malawi-black text-white p-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-gray-800 transition-all">Resolve Inquiry</button>
+               </div>
+             ))}
+             {filteredComplaints.length === 0 && (
+               <div className="col-span-2 p-12 text-center text-gray-400 font-bold uppercase tracking-widest text-[10px]">No support tickets found</div>
+             )}
           </div>
         )}
 
@@ -384,14 +521,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           <div className="overflow-x-auto">
              <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
-                <tr><th className="px-6 py-4">Affiliate</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Referrals</th><th className="px-6 py-4">Balance</th><th className="px-6 py-4">Actions</th></tr>
+                <tr><th className="px-6 py-4">Affiliate</th><th className="px-6 py-4">Membership</th><th className="px-6 py-4">Balance</th><th className="px-6 py-4">Joined On</th><th className="px-6 py-4">Actions</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {state.users.filter(u => u.role === 'USER').map(u => (
+                {filteredUsers.map(u => (
                   <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
                           {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover rounded-full" /> : <Users size={14} />}
                         </div>
                         <div>
@@ -405,106 +542,84 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                         {u.membershipStatus}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-bold">
-                       {state.referrals.filter(r => r.referrerId === u.id).length} Active
-                    </td>
                     <td className="px-6 py-4 font-black">MWK {u.balance.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-gray-400 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
                       {isOwner && (
-                        <button 
-                          onClick={() => promoteToAdmin(u.id)}
-                          className="bg-gray-100 hover:bg-malawi-black hover:text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
-                        >
-                          Promote to Staff
-                        </button>
+                        <button onClick={() => promoteToAdmin(u.id)} className="text-[9px] font-black uppercase text-blue-600 hover:underline">Promote to Staff</button>
                       )}
                     </td>
                   </tr>
                 ))}
+                {filteredUsers.length === 0 && (
+                  <tr><td colSpan={5} className="p-12 text-center text-gray-400 font-bold uppercase tracking-widest text-[10px]">No affiliates match the search criteria</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* Memberships and Complaints list logic remains similar but with updated styling for Admin access */}
-        {tab === 'memberships' && (
-          <div className="overflow-x-auto">
-             <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
-                <tr><th className="px-6 py-4">Affiliate</th><th className="px-6 py-4">Target Tier</th><th className="px-6 py-4">Payment Proof</th><th className="px-6 py-4 text-center">Authorization</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {pendingMemberships.map(m => (
-                  <tr key={m.id}>
-                    <td className="px-6 py-4"><p className="font-bold">{m.fullName}</p><p className="text-[10px] text-gray-400">@{m.username}</p></td>
-                    <td className="px-6 py-4 font-black tracking-tight">{m.membershipTier}</td>
-                    <td className="px-6 py-4">
-                      {m.membershipProofUrl ? (
-                        <Link 
-                          to={`/admin/proof-preview?url=${encodeURIComponent(m.membershipProofUrl)}`} 
-                          target="_blank" 
-                          className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-100 transition-all shadow-sm"
-                        >
-                          <ExternalLink size={14} /> View Slip
-                        </Link>
-                      ) : <span className="text-gray-300 italic text-xs">No receipt</span>}
-                    </td>
-                    <td className="px-6 py-4 flex gap-2 justify-center">
-                      <button onClick={() => handleMembershipAction(m.id, MembershipStatus.ACTIVE)} className="bg-malawi-green text-white px-4 py-2 rounded-xl text-xs font-black uppercase hover:bg-green-700 active:scale-95 transition-all">Verify & Active</button>
-                      <button onClick={() => handleMembershipAction(m.id, MembershipStatus.INACTIVE)} className="bg-malawi-red text-white px-4 py-2 rounded-xl text-xs font-black uppercase hover:bg-red-700 active:scale-95 transition-all">Decline</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {tab === 'complaints' && (
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-             {pendingComplaints.map(c => (
-               <div key={c.id} className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm hover:shadow-xl transition-all flex flex-col justify-between group">
-                  <div>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-malawi-red/10 text-malawi-red flex items-center justify-center font-bold text-xs">?</div>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{c.userName}</span>
-                      </div>
-                      <span className="text-[9px] text-gray-300 font-bold">{new Date(c.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <h4 className="font-black text-malawi-black uppercase tracking-tight mb-2 group-hover:text-malawi-red transition-colors">{c.subject}</h4>
-                    <p className="text-xs text-gray-500 italic mb-6 leading-relaxed">"{c.message}"</p>
-                  </div>
-                  <button onClick={() => setReplyTicket(c)} className="w-full bg-malawi-black text-white p-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-gray-800 transition-all">Prepare Solution</button>
+        {tab === 'team' && isOwner && (
+          <div className="p-8 space-y-8 animate-in slide-in-from-right-4">
+             <div className="flex justify-between items-center">
+               <div>
+                 <h3 className="text-xl font-black uppercase tracking-tight">Staff Roster</h3>
+                 <p className="text-sm text-gray-500">Managing {filteredStaff.length} active administrators</p>
                </div>
-             ))}
-             {pendingComplaints.length === 0 && <div className="col-span-2 p-12 text-center text-gray-400 font-bold uppercase tracking-widest text-xs">No pending inquiries</div>}
+               <button className="bg-malawi-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all">
+                  <UserPlus size={16} /> Add Staff Member
+               </button>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-malawi-black text-white p-6 rounded-[2rem] border-b-4 border-malawi-red shadow-xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-malawi-red"><Crown size={24} /></div>
+                    <div>
+                      <p className="font-black uppercase tracking-tight">{currentUser.fullName}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Platform Architect</p>
+                    </div>
+                  </div>
+                </div>
+
+                {filteredStaff.map(admin => (
+                  <div key={admin.id} className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm hover:shadow-xl transition-all relative group">
+                    <button onClick={() => handleRemoveStaff(admin.id)} className="absolute top-4 right-4 text-gray-300 hover:text-malawi-red transition-colors"><X size={18} /></button>
+                    <div className="flex items-center gap-4 mb-4">
+                       <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400"><ShieldCheck size={24} /></div>
+                       <div>
+                          <p className="font-black uppercase tracking-tight">{admin.fullName}</p>
+                          <p className="text-[9px] font-bold text-malawi-green uppercase tracking-widest">Active Staff</p>
+                       </div>
+                    </div>
+                  </div>
+                ))}
+             </div>
           </div>
         )}
       </section>
 
-      {/* Backend Monitoring View for Admins */}
+      {/* Health Monitoring View */}
       <div className="bg-malawi-black text-white p-8 rounded-[3rem] shadow-2xl relative overflow-hidden">
          <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="space-y-2">
-               <div className="flex items-center gap-2 text-malawi-green font-black uppercase tracking-[0.2em] text-xs">
-                 <ShieldCheck size={16} /> Backend System Health
+            <div className="space-y-2 text-center md:text-left">
+               <div className="flex items-center justify-center md:justify-start gap-2 text-malawi-green font-black uppercase tracking-[0.2em] text-[10px]">
+                 <Activity size={16} /> Operational Health
                </div>
-               <h3 className="text-3xl font-black uppercase leading-none">Database & Network Monitoring</h3>
-               <p className="text-gray-400 text-sm max-w-md">Real-time oversight of transactions, database integrity, and server uptime for the Malawi network.</p>
+               <h3 className="text-3xl font-black uppercase leading-none">Global Network Analytics</h3>
+               <p className="text-gray-400 text-xs max-w-sm">Monitoring {state.users.length} total entities with 99.9% database availability across Malawi.</p>
             </div>
             <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 text-center">
-                  <p className="text-malawi-green text-xl font-black">99.9%</p>
-                  <p className="text-[9px] uppercase font-bold text-gray-500">Uptime</p>
+                  <p className="text-malawi-green text-xl font-black">SECURE</p>
+                  <p className="text-[8px] uppercase font-bold text-gray-500">Connection</p>
                </div>
                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 text-center">
-                  <p className="text-white text-xl font-black">Active</p>
-                  <p className="text-[9px] uppercase font-bold text-gray-500">Node Status</p>
+                  <p className="text-white text-xl font-black">{state.withdrawals.length}</p>
+                  <p className="text-[8px] uppercase font-bold text-gray-500">Lifetime TXs</p>
                </div>
             </div>
          </div>
-         <div className="absolute top-0 right-0 w-64 h-64 bg-malawi-green/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
       </div>
     </div>
   );
