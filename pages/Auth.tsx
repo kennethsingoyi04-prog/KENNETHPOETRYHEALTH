@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AppState, User, Referral, MembershipTier, MembershipStatus } from '../types';
 import { LEVEL_1_COMMISSION_PERCENT, LEVEL_2_COMMISSION_PERCENT, SIGNUP_BONUS } from '../constants';
 import Logo from '../components/Logo';
-import { Mail, Lock, User as UserIcon, Phone, Smartphone, ChevronRight, AtSign, ArrowLeft } from 'lucide-react';
+import { Lock, User as UserIcon, Phone, Smartphone, ChevronRight, AtSign, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { notifyNewRegistration } from '../services/NotificationService';
 
 interface AuthProps {
@@ -19,6 +19,9 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
   const typeParam = searchParams.get('type');
   
   const [isLogin, setIsLogin] = useState(typeParam !== 'signup');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -32,26 +35,35 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
   useEffect(() => {
     if (typeParam === 'signup') setIsLogin(false);
     if (typeParam === 'login') setIsLogin(true);
+    setError(null);
   }, [typeParam]);
 
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
     
-    if (isLogin) {
-      const success = onLogin(formData.email || formData.username, formData.password);
-      if (!success) {
-        alert('Invalid credentials. Check your username/email and password!');
+    // Simulate network delay for a more realistic feel
+    setTimeout(() => {
+      if (isLogin) {
+        const identifier = formData.username || formData.email;
+        const success = onLogin(identifier, formData.password);
+        if (!success) {
+          setError('Invalid login credentials. Please check your username/email and password.');
+          setIsLoading(false);
+        } else {
+          navigate('/dashboard');
+        }
       } else {
-        navigate('/dashboard');
+        const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === formData.username.toLowerCase());
+        if (isUsernameTaken) {
+          setError('This username is already taken. Please choose another one.');
+          setIsLoading(false);
+          return;
+        }
+        finishRegistration();
       }
-    } else {
-      const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === formData.username.toLowerCase());
-      if (isUsernameTaken) {
-        alert('This username is already taken. Please choose another one.');
-        return;
-      }
-      finishRegistration();
-    }
+    }, 1500);
   };
 
   const finishRegistration = () => {
@@ -134,6 +146,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     });
 
     notifyNewRegistration(newUser.fullName, newUser.email, newUserReferralCode);
+    setIsLoading(false);
     navigate('/activate');
   };
 
@@ -141,7 +154,8 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     <div className="max-w-md mx-auto py-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
       <button 
         onClick={() => navigate('/')} 
-        className="mb-8 flex items-center gap-2 text-gray-400 hover:text-malawi-black font-black uppercase text-[10px] tracking-widest transition-colors"
+        disabled={isLoading}
+        className="mb-8 flex items-center gap-2 text-gray-400 hover:text-malawi-black font-black uppercase text-[10px] tracking-widest transition-colors disabled:opacity-50"
       >
         <ArrowLeft size={16} /> Back to Home
       </button>
@@ -154,10 +168,17 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
            <h2 className="text-3xl font-black uppercase tracking-tight text-malawi-black text-center">
              {isLogin ? 'Member Login' : 'Create Account'}
            </h2>
-           <p className="text-gray-500 font-medium text-center">
-             {isLogin ? 'Welcome back, sign in to your earnings' : 'Earn MWK 1,000 bonus on signup'}
+           <p className="text-gray-500 font-medium text-center text-sm mt-2">
+             {isLogin ? 'Sign in to access your dashboard' : 'Join and earn MWK 1,000 bonus on signup'}
            </p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-700 animate-in shake duration-300">
+            <AlertCircle className="shrink-0 mt-0.5" size={18} />
+            <p className="text-xs font-bold leading-relaxed">{error}</p>
+          </div>
+        )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           {!isLogin && (
@@ -167,7 +188,9 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input 
                   type="text" required placeholder="John Phiri"
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
+                  disabled={isLoading}
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                  value={formData.fullName}
                   onChange={e => setFormData({...formData, fullName: e.target.value})}
                 />
               </div>
@@ -175,16 +198,49 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           )}
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username / ID</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{isLogin ? 'Username or Email' : 'Desired Username'}</label>
             <div className="relative">
               <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input 
                 type="text" required placeholder="johnphiri265"
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
+                disabled={isLoading}
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                value={formData.username}
                 onChange={e => setFormData({...formData, username: e.target.value})}
               />
             </div>
           </div>
+
+          {!isLogin && (
+            <>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input 
+                    type="tel" required placeholder="+265..."
+                    disabled={isLoading}
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                    value={formData.phone}
+                    onChange={e => setFormData({...formData, phone: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Verification</label>
+                <div className="relative">
+                  <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input 
+                    type="tel" required placeholder="+265..."
+                    disabled={isLoading}
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                    value={formData.whatsapp}
+                    onChange={e => setFormData({...formData, whatsapp: e.target.value})}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Access Password</label>
@@ -192,23 +248,39 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input 
                 type="password" required placeholder="••••••••"
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all"
+                disabled={isLoading}
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all disabled:opacity-60"
+                value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
             </div>
           </div>
 
-          <button className="w-full bg-malawi-black hover:bg-gray-800 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm uppercase tracking-widest">
-            {isLogin ? 'Sign In' : 'Create Account'}
-            <ChevronRight size={20} />
+          <button 
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-malawi-black hover:bg-gray-800 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm uppercase tracking-widest disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+                <ChevronRight size={20} />
+              </>
+            )}
           </button>
         </form>
 
         <p className="mt-8 text-center text-gray-500 font-medium">
           {isLogin ? "Don't have an account yet?" : "Already a member?"}
           <button 
-            onClick={() => setIsLogin(!isLogin)}
-            className="ml-2 font-black text-malawi-red hover:underline uppercase text-xs tracking-wider"
+            onClick={() => { setIsLogin(!isLogin); setError(null); }}
+            disabled={isLoading}
+            className="ml-2 font-black text-malawi-red hover:underline uppercase text-xs tracking-wider disabled:opacity-50"
           >
             {isLogin ? 'Join Now' : 'Log In'}
           </button>

@@ -18,6 +18,7 @@ export interface MembershipConfig {
   price: number;
   color: string;
   description: string;
+  directCommission: number; // New field for tier-based earnings
 }
 
 export const MEMBERSHIP_TIERS: MembershipConfig[] = [
@@ -26,41 +27,47 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Bronze',
     price: 2000,
     color: '#cd7f32',
-    description: 'Entry level membership with basic referral access.'
+    description: 'Entry level membership with basic referral access.',
+    directCommission: 30
   },
   {
     tier: MembershipTier.PLATINUM,
     name: 'Platinum',
     price: 5000,
     color: '#e5e4e2',
-    description: 'Enhanced tier for consistent affiliates.'
+    description: 'Enhanced tier for consistent affiliates.',
+    directCommission: 32
   },
   {
     tier: MembershipTier.SILVER,
     name: 'Silver',
     price: 10000,
     color: '#c0c0c0',
-    description: 'Professional tier with priority support.'
+    description: 'Professional tier with priority support.',
+    directCommission: 34
   },
   {
     tier: MembershipTier.COPPER,
     name: 'Copper',
     price: 15000,
     color: '#b87333',
-    description: 'Exclusive tier with higher earning potential.'
+    description: 'Exclusive tier with higher earning potential.',
+    directCommission: 36
   },
   {
     tier: MembershipTier.ALUMINIUM,
     name: 'Aluminium',
     price: 20000,
     color: '#d1d1d1',
-    description: 'Premium tier for network leaders.'
+    description: 'Premium tier for network leaders.',
+    directCommission: 38
   },
   {
     tier: MembershipTier.GOLD,
     name: 'Gold',
     price: 25000,
     color: '#ffd700',
-    description: 'Elite membership with maximum platform benefits.'
+    description: 'Elite membership with maximum platform benefits.',
+    directCommission: 40
   }
 ];
