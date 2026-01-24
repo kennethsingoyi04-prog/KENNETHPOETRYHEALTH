@@ -29,7 +29,10 @@ const App: React.FC = () => {
   
   const [state, setState] = useState<AppState>({
     currentUser: null,
-    systemSettings: { masterKey: 'KPH-OWNER-2025', maintenanceMode: false },
+    systemSettings: { 
+      masterKey: process.env.MASTER_KEY || 'KPH-OWNER-2025', 
+      maintenanceMode: false 
+    },
     users: [{
       id: 'owner-1',
       username: 'owner',
@@ -70,7 +73,11 @@ const App: React.FC = () => {
           setState(prev => ({
             ...prev,
             ...cloudData,
-            currentUser: sessionUser || null
+            currentUser: sessionUser || null,
+            systemSettings: {
+               ...prev.systemSettings,
+               ...(cloudData.systemSettings || {})
+            }
           }));
           lastSyncRef.current = JSON.stringify(cloudData);
         }
@@ -80,10 +87,6 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  /**
-   * Manual Cloud Sync Logic
-   * This is the "Netlify Saver": It only runs when called.
-   */
   const triggerManualSync = async () => {
     if (!isOnline || isSyncing) return;
     setIsSyncing(true);
@@ -105,7 +108,6 @@ const App: React.FC = () => {
         const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
         if (refreshedUser) newState.currentUser = refreshedUser;
       }
-      // Flag that local data is now different from cloud data
       setHasUnsavedChanges(true);
       return newState;
     });

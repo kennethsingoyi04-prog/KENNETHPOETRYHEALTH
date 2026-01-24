@@ -24,6 +24,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [connStatus, setConnStatus] = useState<'IDLE' | 'TESTING' | 'SUCCESS' | 'FAILED'>('IDLE');
   const [payloadSize, setPayloadSize] = useState<number>(0);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedEnv, setCopiedEnv] = useState(false);
   
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
   const [payoutNote, setPayoutNote] = useState<{ [key: string]: string }>({});
@@ -49,6 +50,10 @@ ON CONFLICT (id) DO NOTHING;
 -- 5. Allow public to upload to images bucket
 CREATE POLICY "Public Upload Access" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'images');
 CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_id = 'images');`;
+
+  const ENV_TEMPLATE = `SUPABASE_URL=[PASTE_YOUR_PROJECT_URL_HERE]
+SUPABASE_KEY=[PASTE_YOUR_ANON_PUBLIC_KEY_HERE]
+MASTER_KEY=[CHOOSE_A_SECRET_ADMIN_PASSWORD]`;
 
   useEffect(() => {
     testSupabaseConnection();
@@ -80,6 +85,12 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
     navigator.clipboard.writeText(SUPABASE_SQL);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 3000);
+  };
+
+  const handleCopyEnv = () => {
+    navigator.clipboard.writeText(ENV_TEMPLATE);
+    setCopiedEnv(true);
+    setTimeout(() => setCopiedEnv(false), 3000);
   };
 
   const handleNuclearPurge = async () => {
@@ -268,25 +279,21 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                    </div>
 
                    <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Key size={20} /> 2. Connection Setup (Netlify)</h3>
+                      <div className="flex items-center justify-between mb-8">
+                         <h3 className="text-xl font-black uppercase flex items-center gap-2"><Key size={20} /> 2. Connection Setup (Netlify)</h3>
+                         <button onClick={handleCopyEnv} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
+                            {copiedEnv ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
+                            {copiedEnv ? 'Copied!' : 'Copy Env Block'}
+                         </button>
+                      </div>
                       <div className="space-y-6">
                         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                           <p className="text-xs font-black text-malawi-black uppercase mb-4">Step A: Get Keys from Supabase</p>
-                           <ul className="text-[10px] font-bold text-gray-500 uppercase space-y-2 list-disc ml-4">
-                              <li>Go to <span className="text-malawi-black">Project Settings</span> -> <span className="text-malawi-black">API</span></li>
-                              <li>Copy the <span className="text-malawi-red font-black">Project URL</span></li>
-                              <li>Copy the <span className="text-malawi-red font-black">anon public</span> Key</li>
-                           </ul>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                           <p className="text-xs font-black text-malawi-black uppercase mb-4 flex items-center gap-2"><FileCode size={16} /> Step B: Import into Netlify</p>
-                           <p className="text-[10px] font-bold text-gray-400 uppercase mb-4">
-                             When Netlify asks to "Import Environment Variables" or shows a blank space for ".env contents", paste this:
+                           <p className="text-xs font-black text-malawi-black uppercase mb-4 flex items-center gap-2"><FileCode size={16} /> Netlify Env Format</p>
+                           <p className="text-[10px] font-bold text-gray-400 uppercase mb-4 leading-relaxed">
+                             In the Netlify "Contents of .env file" box, paste this block and fill in your Supabase keys:
                            </p>
-                           <div className="bg-malawi-black p-4 rounded-xl font-mono text-[10px] text-malawi-green space-y-2">
-                              <p>SUPABASE_URL=[Paste your Project URL here]</p>
-                              <p>SUPABASE_KEY=[Paste your anon Key here]</p>
+                           <div className="bg-malawi-black p-4 rounded-xl font-mono text-[10px] text-malawi-green space-y-2 relative group">
+                              <pre className="whitespace-pre-wrap">{ENV_TEMPLATE}</pre>
                            </div>
                            <p className="mt-4 text-[9px] text-gray-400 font-black uppercase flex items-center gap-2">
                              <ExternalLink size={12} /> Found in: Netlify Dashboard -> Site Configuration -> Environment Variables
