@@ -50,7 +50,7 @@ export interface User {
   totalEarnings: number;
   createdAt: string;
   lastLoginAt?: string; 
-  isBanned?: boolean; // New: Admin moderation
+  isBanned?: boolean;
   password?: string;
   profilePic?: string;
   bio?: string;
@@ -90,9 +90,9 @@ export interface Complaint {
   userName: string;
   subject: string;
   message: string;
-  imageUrl?: string; // Attachment from user
+  imageUrl?: string; 
   reply?: string;
-  replyImageUrl?: string; // Attachment from admin
+  replyImageUrl?: string;
   status: 'PENDING' | 'RESOLVED';
   createdAt: string;
   updatedAt: string;
