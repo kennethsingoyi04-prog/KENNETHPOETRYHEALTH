@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Vercel Official Integration Variables.
- * If you use the Vercel + Supabase integration, these are injected automatically.
+ * Netlify & Supabase Environment Variables.
+ * These are configured in the Netlify Dashboard under Site Configuration.
  */
 const supabaseUrl = 
   process.env.NEXT_PUBLIC_SUPABASE_URL || 

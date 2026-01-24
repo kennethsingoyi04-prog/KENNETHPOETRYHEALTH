@@ -1,6 +1,6 @@
 {
   "name": "KPH TRANSFORM MALAWI",
-  "description": "Premium Affiliate Marketing Platform for Malawi. Optimized for Vercel & Supabase Zero-Billing deployments. Features high-speed MWK payouts and AI-driven growth tools.",
+  "description": "Premium Affiliate Marketing Platform for Malawi. Optimized for Netlify & Supabase Zero-Billing deployments. Features high-speed MWK payouts and AI-driven growth tools.",
   "requestFramePermissions": [
     "camera"
   ]
