@@ -212,7 +212,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                       <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Terminal size={20} /> Vercel Setup Guide</h3>
                       <div className="space-y-4 text-xs font-bold text-gray-500 uppercase">
                         <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">1</span> Connect GitHub to Vercel</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Go to Settings -> Environment Variables</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Go to Settings {"->"} Environment Variables</p>
                         <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">3</span> Add SUPABASE_URL and SUPABASE_KEY</p>
                       </div>
                    </div>
