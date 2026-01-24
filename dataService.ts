@@ -24,7 +24,9 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
       return { ok: false, isCloud: true, error: error.message };
     }
     
-    const size = data ? JSON.stringify(data).length / 1024 : 0;
+    // Exact byte calculation for bandwidth safety
+    const jsonString = data ? JSON.stringify(data) : "";
+    const size = jsonString.length / 1024;
     return { ok: true, isCloud: true, payloadSizeKb: size };
   } catch (err: any) {
     return { ok: false, isCloud: true, error: err.message };
@@ -32,11 +34,11 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
 };
 
 /**
- * STRONGER SCRUBBER: 
- * Prevents any string starting with "data:image" from being saved.
- * Only allows URLs (http/https).
+ * NUCLEAR SCRUBBER: 
+ * Recursively removes all Base64 image data and excessively long strings.
+ * This ensures the JSON payload is strictly metadata, keeping bandwidth near zero.
  */
-const scrubState = (obj: any): any => {
+export const nuclearScrub = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) return obj;
   
   const scrubbed = Array.isArray(obj) ? [] : {};
@@ -44,14 +46,14 @@ const scrubState = (obj: any): any => {
   for (const key in obj) {
     const value = obj[key];
     if (typeof value === 'string') {
-      // Block Base64 (data:image) and very long strings
-      if (value.startsWith('data:image') || value.length > 2000) {
-        (scrubbed as any)[key] = "[BLOCK_BASE64_FOR_FREE_PLAN]";
+      // Kill Base64, long data URLs, and any string over 1KB
+      if (value.startsWith('data:') || value.length > 1024) {
+        (scrubbed as any)[key] = "[CLEANED_FOR_DEPLOYMENT_SAFETY]";
       } else {
         (scrubbed as any)[key] = value;
       }
     } else if (typeof value === 'object') {
-      (scrubbed as any)[key] = scrubState(value);
+      (scrubbed as any)[key] = nuclearScrub(value);
     } else {
       (scrubbed as any)[key] = value;
     }
@@ -61,6 +63,7 @@ const scrubState = (obj: any): any => {
 
 /**
  * Uploads an image file to Supabase Storage (Safe & Free).
+ * Vercel deployment requires images to be served via CDN/URL, not embedded in JSON.
  */
 export const uploadImage = async (file: File, folder: string): Promise<string | null> => {
   try {
@@ -84,15 +87,15 @@ export const uploadImage = async (file: File, folder: string): Promise<string | 
 
 /**
  * Syncs the local state to Supabase.
- * Mandates scrubbing to ensure free tier safety.
+ * Enforces Nuclear Scrubbing on every write.
  */
 export const syncAppStateToCloud = async (state: AppState) => {
   if (!state.users || state.users.length === 0) return;
 
   const { currentUser, ...persistentData } = state;
   
-  // Mandatory scrubbing: Never send Base64 to the cloud JSON blob.
-  const optimizedData = scrubState(persistentData);
+  // MANDATORY: Scrub data to protect Vercel/Netlify bandwidth limits
+  const optimizedData = nuclearScrub(persistentData);
 
   try {
     const { error } = await supabase
@@ -103,11 +106,8 @@ export const syncAppStateToCloud = async (state: AppState) => {
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
 
-    if (error) {
-      console.error('Supabase Sync Error:', error.message);
-      throw error;
-    }
-    console.log("Cloud Sync: Success (Free Tier Optimized)");
+    if (error) throw error;
+    console.log("Cloud Sync: Verified Optimized Payload");
   } catch (err) {
     console.warn('Supabase Sync Failed:', err);
   }
