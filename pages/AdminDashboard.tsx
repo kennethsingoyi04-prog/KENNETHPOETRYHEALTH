@@ -1,12 +1,13 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { AppState, WithdrawalStatus, MembershipStatus, Complaint, User, WithdrawalRequest } from '../types';
+import { AppState, WithdrawalStatus, MembershipStatus, Complaint, User, WithdrawalRequest, Referral } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { checkCloudHealth, CloudStatus, syncAppStateToCloud } from '../dataService';
 import { 
   ShieldCheck, Loader2, AlertTriangle, 
   Cloud, CloudOff, Database, RefreshCw, Check, Search, Flame, Server,
-  UserCheck, MessageSquare, Eye, X, CheckCircle2, Wallet, ExternalLink
+  UserCheck, MessageSquare, Eye, X, CheckCircle2, Wallet, ExternalLink,
+  ChevronRight, Users, TrendingUp, Calendar, Clock, ArrowLeft, Target, Award
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,6 +23,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [isChecking, setIsChecking] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  const [inspectingUser, setInspectingUser] = useState<User | null>(null);
 
   const runHealthCheck = async () => {
     setIsChecking(true);
@@ -67,7 +69,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       u.fullName.toLowerCase().includes(searchText.toLowerCase()) || 
       u.username.toLowerCase().includes(searchText.toLowerCase()) ||
       u.phone.includes(searchText)
-    );
+    ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [state.users, searchText]);
 
   // --- Actions ---
@@ -81,6 +83,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       u.id === userId ? { ...u, membershipStatus: status } : u
     );
     onStateUpdate({ users: updatedUsers });
+    if (inspectingUser?.id === userId) {
+      setInspectingUser(prev => prev ? { ...prev, membershipStatus: status } : null);
+    }
   };
 
   const handleReplyComplaint = (id: string) => {
@@ -103,8 +108,201 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     navigate(`/admin/proof-preview?url=${encodeURIComponent(url)}`);
   };
 
+  const UserInspector = ({ user }: { user: User }) => {
+    const directDownlines = state.users.filter(u => u.referredBy === user.id);
+    const directIds = directDownlines.map(u => u.id);
+    const indirectDownlines = state.users.filter(u => directIds.includes(u.referredBy || ''));
+    const userReferrals = state.referrals.filter(r => r.referrerId === user.id);
+    const userWithdrawals = state.withdrawals.filter(w => w.userId === user.id);
+
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setInspectingUser(null)}></div>
+        <div className="relative bg-white w-full max-w-4xl h-full max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+          <div className="p-6 sm:p-10 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setInspectingUser(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <h2 className="text-2xl font-black uppercase tracking-tight">Inspecting Affiliate</h2>
+                <p className="text-xs font-bold text-gray-400">ID: {user.id}</p>
+              </div>
+            </div>
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+              user.membershipStatus === MembershipStatus.ACTIVE ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+              {user.membershipStatus}
+            </div>
+          </div>
+
+          <div className="flex-grow overflow-y-auto p-6 sm:p-10 space-y-10 scrollbar-hide">
+            {/* Core Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-malawi-green text-white p-6 rounded-[2rem] shadow-lg shadow-green-500/10">
+                <Wallet size={20} className="mb-4 opacity-60" />
+                <p className="text-[10px] uppercase font-black tracking-widest opacity-80">Balance</p>
+                <p className="text-2xl font-black">MWK {user.balance.toLocaleString()}</p>
+              </div>
+              <div className="bg-malawi-black text-white p-6 rounded-[2rem] shadow-lg">
+                <TrendingUp size={20} className="mb-4 opacity-60 text-malawi-red" />
+                <p className="text-[10px] uppercase font-black tracking-widest opacity-80">Total Earned</p>
+                <p className="text-2xl font-black">MWK {user.totalEarnings.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-50 p-6 rounded-[2rem] border">
+                <Users size={20} className="mb-4 opacity-40 text-blue-600" />
+                <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Team Size</p>
+                <p className="text-2xl font-black text-gray-900">{directDownlines.length + indirectDownlines.length}</p>
+              </div>
+              <div className="bg-gray-50 p-6 rounded-[2rem] border">
+                <Award size={20} className="mb-4 opacity-40 text-yellow-600" />
+                <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Tier</p>
+                <p className="text-2xl font-black text-gray-900">{user.membershipTier}</p>
+              </div>
+            </div>
+
+            {/* Profile Info & Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                  <UserCheck size={16} /> Contact Details
+                </h3>
+                <div className="bg-gray-50 rounded-3xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Phone</span>
+                    <span className="text-sm font-black">{user.phone}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">WhatsApp</span>
+                    <span className="text-sm font-black text-green-600">{user.whatsapp}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Email</span>
+                    <span className="text-sm font-black">{user.email}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                  <Clock size={16} /> Activity Log
+                </h3>
+                <div className="bg-gray-50 rounded-3xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Joined Platform</span>
+                    <span className="text-sm font-black">{new Date(user.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Last Login</span>
+                    <span className="text-sm font-black text-blue-600">
+                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Referral Tracking */}
+            <div className="space-y-4">
+              <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                <Target size={16} /> Downline Network
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Level 1 */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black uppercase text-malawi-green ml-1">Direct Referrals (Level 1)</p>
+                  <div className="bg-white border rounded-[2rem] overflow-hidden">
+                    {directDownlines.length === 0 ? (
+                      <p className="p-8 text-center text-xs text-gray-400 italic">No direct referrals.</p>
+                    ) : directDownlines.map(d => (
+                      <div key={d.id} className="p-4 flex items-center justify-between hover:bg-gray-50 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-[10px] font-black">
+                            {d.fullName.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black">{d.fullName}</p>
+                            <p className="text-[9px] text-gray-400">@{d.username}</p>
+                          </div>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                          d.membershipStatus === MembershipStatus.ACTIVE ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {d.membershipStatus}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Level 2 */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black uppercase text-blue-500 ml-1">Indirect Referrals (Level 2)</p>
+                  <div className="bg-white border rounded-[2rem] overflow-hidden">
+                    {indirectDownlines.length === 0 ? (
+                      <p className="p-8 text-center text-xs text-gray-400 italic">No indirect referrals.</p>
+                    ) : indirectDownlines.map(d => (
+                      <div key={d.id} className="p-4 flex items-center justify-between hover:bg-gray-50 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-[10px] font-black">
+                            {d.fullName.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black">{d.fullName}</p>
+                            <p className="text-[9px] text-gray-400">@{d.username}</p>
+                          </div>
+                        </div>
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                          {d.membershipStatus}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Earnings Audit */}
+            <div className="space-y-4">
+              <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                <Database size={16} /> Commission History
+              </h3>
+              <div className="bg-white border rounded-[2rem] overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-6 py-4 font-black uppercase text-[10px]">Source</th>
+                      <th className="px-6 py-4 font-black uppercase text-[10px]">Level</th>
+                      <th className="px-6 py-4 font-black uppercase text-[10px]">Amount</th>
+                      <th className="px-6 py-4 font-black uppercase text-[10px]">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {userReferrals.length === 0 ? (
+                      <tr><td colSpan={4} className="p-12 text-center text-gray-400 italic">No commissions earned yet.</td></tr>
+                    ) : userReferrals.map(r => {
+                      const referred = state.users.find(u => u.id === r.referredId);
+                      return (
+                        <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 font-bold">{referred?.fullName || 'Deleted User'}</td>
+                          <td className="px-6 py-4"><span className="bg-gray-100 px-2 py-0.5 rounded font-black">L{r.level}</span></td>
+                          <td className="px-6 py-4 font-black text-malawi-green">MWK {r.commission.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-gray-400">{new Date(r.timestamp).toLocaleDateString()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-500">
+      {inspectingUser && <UserInspector user={inspectingUser} />}
+
       {/* Supabase Setup Guide */}
       {!cloudInfo.ok && !isChecking && (
         <div className="bg-blue-50 border-2 border-blue-100 p-8 rounded-[2.5rem] space-y-6 shadow-xl">
@@ -177,7 +375,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE app_state;`}
           { id: 'withdrawals', label: 'Withdrawals', count: state.withdrawals.filter(w => w.status === 'PENDING').length },
           { id: 'memberships', label: 'Pending Tiers', count: state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING).length },
           { id: 'complaints', label: 'Support', count: state.complaints.filter(c => c.status === 'PENDING').length },
-          { id: 'users', label: 'All Affiliates', count: state.users.length }
+          { id: 'users', label: 'Affiliates', count: state.users.length }
         ].map((item) => (
           <button 
             key={item.id} 
@@ -319,30 +517,40 @@ ALTER PUBLICATION supabase_realtime ADD TABLE app_state;`}
              <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
                 <tr>
-                  <th className="px-6 py-4">User Details</th>
-                  <th className="px-6 py-4">Tier</th>
+                  <th className="px-6 py-4">Affiliate</th>
+                  <th className="px-6 py-4">Joined / Seen</th>
                   <th className="px-6 py-4">Wallet</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-center">Audit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {allUsers.map(u => (
-                  <tr key={u.id} className="hover:bg-gray-50/50">
+                  <tr key={u.id} className="hover:bg-gray-50/50 group transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 overflow-hidden">
-                            {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover" /> : <UserCheck size={20} />}
+                         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 overflow-hidden ring-2 ring-transparent group-hover:ring-malawi-green transition-all">
+                            {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover" alt="" /> : <UserCheck size={20} />}
                          </div>
                          <div>
                             <p className="font-bold">{u.fullName}</p>
-                            <p className="text-[10px] text-gray-400">@{u.username} • {u.phone}</p>
+                            <p className="text-[10px] text-gray-400 uppercase font-black">@{u.username}</p>
                          </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                       <span className="text-[10px] font-black uppercase" style={{ color: MEMBERSHIP_TIERS.find(t => t.tier === u.membershipTier)?.color }}>
-                         {u.membershipTier}
-                       </span>
+                       <div className="flex flex-col gap-1">
+                         <div className="flex items-center gap-1.5 text-gray-500">
+                           <Calendar size={12} className="opacity-40" />
+                           <span className="text-[10px] font-bold">{new Date(u.createdAt).toLocaleDateString()}</span>
+                         </div>
+                         <div className="flex items-center gap-1.5 text-blue-600">
+                           <Clock size={12} className="opacity-40" />
+                           <span className="text-[10px] font-black uppercase tracking-tighter">
+                             {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Inactive'}
+                           </span>
+                         </div>
+                       </div>
                     </td>
                     <td className="px-6 py-4">
                        <div className="flex flex-col">
@@ -357,6 +565,17 @@ ALTER PUBLICATION supabase_realtime ADD TABLE app_state;`}
                        }`}>
                          {u.membershipStatus}
                        </span>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="flex justify-center">
+                         <button 
+                           onClick={() => setInspectingUser(u)}
+                           className="p-2 bg-gray-100 hover:bg-malawi-black hover:text-white rounded-xl transition-all shadow-sm"
+                           title="Inspect Affiliate"
+                         >
+                           <Search size={16} />
+                         </button>
+                       </div>
                     </td>
                   </tr>
                 ))}

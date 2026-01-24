@@ -40,6 +40,7 @@ const App: React.FC = () => {
       balance: 0,
       totalEarnings: 0,
       createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
       password: 'ownerpassword',
       membershipTier: MembershipTier.GOLD,
       membershipStatus: MembershipStatus.ACTIVE
@@ -60,7 +61,6 @@ const App: React.FC = () => {
         const savedUid = localStorage.getItem(SESSION_KEY);
         
         if (cloudData) {
-          // Cloud found: Use cloud users and try to restore session
           const cloudUsers = cloudData.users || [];
           const sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
           
@@ -70,7 +70,6 @@ const App: React.FC = () => {
             currentUser: sessionUser || null
           }));
         } else {
-          // Cloud empty: Seed the database with the initial owner state
           await syncAppStateToCloud(state);
         }
       }
@@ -79,7 +78,7 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  // 2. Continuous Sync (Debounced to avoid rate limiting)
+  // 2. Continuous Sync
   useEffect(() => {
     if (isReady && isOnline) {
       const timeout = setTimeout(() => {
@@ -95,8 +94,18 @@ const App: React.FC = () => {
       (!u.password || u.password === password)
     );
     if (user) {
+      const now = new Date().toISOString();
+      const updatedUser = { ...user, lastLoginAt: now };
+      
+      // Update the user list with the new lastLoginAt
+      const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
+      
       localStorage.setItem(SESSION_KEY, user.id);
-      setState(prev => ({ ...prev, currentUser: user }));
+      setState(prev => ({ 
+        ...prev, 
+        users: updatedUsers,
+        currentUser: updatedUser 
+      }));
       return true;
     }
     return false;
@@ -110,7 +119,6 @@ const App: React.FC = () => {
   const updateUserState = useCallback((updatedState: Partial<AppState>) => {
     setState(prev => {
       const newState = { ...prev, ...updatedState };
-      // If we are updating users, make sure the current session object is also updated
       if (updatedState.users && prev.currentUser) {
         const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
         if (refreshedUser) newState.currentUser = refreshedUser;
@@ -119,7 +127,6 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // 3. Loading Screen
   if (!isReady) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-malawi-black text-white space-y-6">

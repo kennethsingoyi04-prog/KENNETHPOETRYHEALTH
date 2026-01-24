@@ -45,16 +45,16 @@ export interface User {
   referralCode: string;
   referredBy?: string;
   role: UserRole;
-  isOwner?: boolean; // New: To distinguish the app owner from staff admins
+  isOwner?: boolean; 
   balance: number;
   totalEarnings: number;
   createdAt: string;
+  lastLoginAt?: string; // New: Track user activity
   password?: string;
   profilePic?: string;
   bio?: string;
   location?: string;
   notificationPrefs?: NotificationPreferences;
-  // Membership Fields
   membershipTier: MembershipTier;
   membershipStatus: MembershipStatus;
   membershipProofUrl?: string;
