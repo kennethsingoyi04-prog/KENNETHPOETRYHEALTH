@@ -9,6 +9,9 @@ export type CloudStatus = {
   payloadSizeKb?: number;
 };
 
+// Hard limit to stay in Vercel's Free Tier forever
+const MAX_PAYLOAD_KB = 300; 
+
 /**
  * Checks if the Supabase connection is working and returns payload size.
  */
@@ -24,7 +27,6 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
       return { ok: false, isCloud: true, error: error.message };
     }
     
-    // Exact byte calculation for bandwidth safety
     const jsonString = data ? JSON.stringify(data) : "";
     const size = jsonString.length / 1024;
     return { ok: true, isCloud: true, payloadSizeKb: size };
@@ -34,9 +36,9 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
 };
 
 /**
- * NUCLEAR SCRUBBER: 
- * Recursively removes all Base64 image data and excessively long strings.
- * This ensures the JSON payload is strictly metadata, keeping bandwidth near zero.
+ * AGGRESSIVE SCRUBBER: 
+ * Ensures the JSON payload is strictly metadata. 
+ * Any string over 500 chars is considered a potential threat to bandwidth.
  */
 export const nuclearScrub = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) return obj;
@@ -46,9 +48,9 @@ export const nuclearScrub = (obj: any): any => {
   for (const key in obj) {
     const value = obj[key];
     if (typeof value === 'string') {
-      // Kill Base64, long data URLs, and any string over 1KB
-      if (value.startsWith('data:') || value.length > 1024) {
-        (scrubbed as any)[key] = "[CLEANED_FOR_DEPLOYMENT_SAFETY]";
+      // If a string is suspiciously long (like Base64), strip it.
+      if (value.startsWith('data:') || value.length > 500) {
+        (scrubbed as any)[key] = "[BANDWIDTH_SAFETY_REMOVAL]";
       } else {
         (scrubbed as any)[key] = value;
       }
@@ -62,8 +64,8 @@ export const nuclearScrub = (obj: any): any => {
 };
 
 /**
- * Uploads an image file to Supabase Storage (Safe & Free).
- * Vercel deployment requires images to be served via CDN/URL, not embedded in JSON.
+ * Safe Image Upload:
+ * Stores images in Supabase Storage (which doesn't count against Vercel bandwidth).
  */
 export const uploadImage = async (file: File, folder: string): Promise<string | null> => {
   try {
@@ -86,16 +88,21 @@ export const uploadImage = async (file: File, folder: string): Promise<string | 
 };
 
 /**
- * Syncs the local state to Supabase.
- * Enforces Nuclear Scrubbing on every write.
+ * BANDWIDTH-GUARDED SYNC:
+ * Refuses to sync if the data would exceed the free tier safety limit.
  */
 export const syncAppStateToCloud = async (state: AppState) => {
   if (!state.users || state.users.length === 0) return;
 
   const { currentUser, ...persistentData } = state;
-  
-  // MANDATORY: Scrub data to protect Vercel/Netlify bandwidth limits
   const optimizedData = nuclearScrub(persistentData);
+  const sizeKb = JSON.stringify(optimizedData).length / 1024;
+
+  // PROTECTION: Prevent billing by blocking massive syncs
+  if (sizeKb > MAX_PAYLOAD_KB) {
+    console.error(`CRITICAL: Payload size (${sizeKb.toFixed(1)}KB) exceeds safety limit. Sync blocked to prevent billing.`);
+    return;
+  }
 
   try {
     const { error } = await supabase
@@ -107,7 +114,7 @@ export const syncAppStateToCloud = async (state: AppState) => {
       }, { onConflict: 'id' });
 
     if (error) throw error;
-    console.log("Cloud Sync: Verified Optimized Payload");
+    console.log(`Cloud Sync Success: ${sizeKb.toFixed(1)}KB used.`);
   } catch (err) {
     console.warn('Supabase Sync Failed:', err);
   }
