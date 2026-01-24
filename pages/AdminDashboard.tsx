@@ -52,8 +52,7 @@ CREATE POLICY "Public Upload Access" ON storage.objects FOR INSERT WITH CHECK (b
 CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_id = 'images');`;
 
   const ENV_TEMPLATE = `SUPABASE_URL=[PASTE_YOUR_PROJECT_URL_HERE]
-SUPABASE_KEY=[PASTE_YOUR_ANON_PUBLIC_KEY_HERE]
-MASTER_KEY=[CHOOSE_A_SECRET_ADMIN_PASSWORD]`;
+SUPABASE_KEY=[PASTE_YOUR_ANON_PUBLIC_KEY_HERE]`;
 
   useEffect(() => {
     testSupabaseConnection();

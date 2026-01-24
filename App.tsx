@@ -30,7 +30,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     currentUser: null,
     systemSettings: { 
-      masterKey: process.env.MASTER_KEY || 'KPH-OWNER-2025', 
+      masterKey: 'KPH-OWNER-2025', 
       maintenanceMode: false 
     },
     users: [{
