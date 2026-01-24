@@ -228,7 +228,7 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                             <h2 className="text-3xl font-black uppercase tracking-tight">Netlify & Supabase Sync</h2>
                          </div>
                          <p className="text-sm font-bold opacity-80 uppercase leading-relaxed mb-6">
-                           Your database is currently optimized for Supabase Free Tier (500MB). We have blocked heavy data transfers to ensure you never pay a cent.
+                           Your database is currently optimized for Supabase Free Tier (500MB). We have blocked heavy data transfers to ensure you never pay a cent for bandwidth or storage.
                          </p>
                          <div className="flex gap-4">
                             <div className="bg-white/20 p-4 rounded-2xl">
@@ -239,8 +239,8 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                                </div>
                             </div>
                             <div className="bg-white/20 p-4 rounded-2xl">
-                               <p className="text-[10px] font-black uppercase">Handshake</p>
-                               <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'CONNECTED' : connStatus === 'TESTING' ? 'WAIT...' : 'FAILED'}</p>
+                               <p className="text-[10px] font-black uppercase">Sync Health</p>
+                               <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'CONNECTED' : connStatus === 'TESTING' ? 'TESTING...' : 'DISCONNECTED'}</p>
                             </div>
                          </div>
                       </div>
@@ -262,17 +262,18 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                       <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-3 text-blue-800">
                         <Info size={18} className="shrink-0" />
                         <p className="text-[10px] font-bold uppercase leading-relaxed">
-                           Paste this code into the "SQL Editor" on Supabase.com and click "Run". This will automatically link your app and storage buckets.
+                           Paste this code into the "SQL Editor" on Supabase.com and click "Run". This is required to keep your app free.
                         </p>
                       </div>
                    </div>
 
                    <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Database size={20} /> Netlify Setup Guide</h3>
+                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Database size={20} /> Netlify Zero-Cost Deployment</h3>
                       <div className="space-y-4 text-xs font-bold text-gray-500 uppercase">
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">1</span> Go to Netlify -> Site Configuration -> Environment Variables</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Add <code className="text-malawi-red">SUPABASE_URL</code> from Project Settings</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">3</span> Add <code className="text-malawi-red">SUPABASE_KEY</code> (Anon/Public Key)</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">1</span> Open Netlify Dashboard {"->"} Site Configuration</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Go to Environment Variables {"->"} Add Variable</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">3</span> Input your <code className="text-malawi-red">SUPABASE_URL</code> and <code className="text-malawi-red">SUPABASE_KEY</code></p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">4</span> Deploy to start your Free-Forever Affiliate Empire</p>
                       </div>
                    </div>
                 </div>
@@ -280,7 +281,7 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                 <div className="lg:col-span-4">
                    <div className="bg-malawi-black text-white p-10 rounded-[3.5rem] border-b-8 border-malawi-red shadow-2xl">
                       <h3 className="text-xl font-black uppercase mb-6 flex items-center gap-2 text-malawi-red">
-                         <ZapOff size={24} /> Billing Guard
+                         <ZapOff size={24} /> Zero-Billing Guard
                       </h3>
                       <button 
                         onClick={handleNuclearPurge}
@@ -288,10 +289,10 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                         className="w-full py-6 bg-malawi-red text-white font-black rounded-3xl uppercase text-xs tracking-widest shadow-xl active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
                       >
                         {isChecking ? <Loader2 className="animate-spin" /> : <Trash2 size={18} />}
-                        Zero-Billing Purge
+                        Billing Safety Purge
                       </button>
                       <p className="text-[9px] text-gray-500 font-black uppercase text-center mt-6 leading-relaxed">
-                        Forces the database to stay tiny and free by stripping old heavy assets.
+                        Manually force-scrub large data from the cloud to ensure you never exceed free limits.
                       </p>
                    </div>
                 </div>
@@ -322,7 +323,7 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                         <button onClick={() => setViewingProofUrl(w.proofUrl || null)} className="w-12 h-12 rounded-xl overflow-hidden border shadow-sm">
                            <img src={w.proofUrl} className="w-full h-full object-cover" />
                         </button>
-                      ) : <span className="text-[9px] font-black text-gray-300">Sync Limit</span>}
+                      ) : <span className="text-[9px] font-black text-gray-300">Protected</span>}
                     </td>
                     <td className="px-10 py-8 font-black text-malawi-green">MWK {w.amount.toLocaleString()}</td>
                     <td className="px-10 py-8 text-center">
