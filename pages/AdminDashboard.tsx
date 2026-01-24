@@ -9,7 +9,7 @@ import {
   UserCheck, MessageSquare, Eye, X, CheckCircle2, Wallet, ExternalLink,
   ChevronRight, Users, TrendingUp, Calendar, Clock, ArrowLeft, Target, Award,
   Activity, Zap, UserPlus, LogIn, Filter, Edit3, Save, Ban, ShieldAlert,
-  Trash2
+  Trash2, Radio
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -55,6 +55,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     return events.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 50);
   }, [state.users]);
 
+  // Helper to determine if a user is currently "Online" (active in last 10 mins)
+  const isUserOnline = (user: User) => {
+    if (!user.lastLoginAt) return false;
+    const lastActive = new Date(user.lastLoginAt).getTime();
+    const now = new Date().getTime();
+    return (now - lastActive) < 600000; // 10 minutes threshold
+  };
+
+  const liveUsersCount = useMemo(() => {
+    return state.users.filter(u => isUserOnline(u)).length;
+  }, [state.users]);
+
   const filteredWithdrawals = useMemo(() => {
     return state.withdrawals.filter(w => 
       w.userName.toLowerCase().includes(searchText.toLowerCase()) || 
@@ -68,6 +80,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       u.username.toLowerCase().includes(searchText.toLowerCase()) ||
       u.phone.includes(searchText)
     ).sort((a, b) => {
+      // Primary sort: Online users first
+      const aOnline = isUserOnline(a);
+      const bOnline = isUserOnline(b);
+      if (aOnline && !bOnline) return -1;
+      if (!aOnline && bOnline) return 1;
+
+      // Secondary sort: Last login time
       const aTime = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
       const bTime = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
       return bTime - aTime;
@@ -99,11 +118,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     setReplyText(prev => ({ ...prev, [id]: '' }));
   };
 
-  const viewProof = (url?: string) => {
-    if (!url) return;
-    navigate(`/admin/proof-preview?url=${encodeURIComponent(url)}`);
-  };
-
   const UserInspector = ({ user }: { user: User }) => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [editData, setEditData] = useState<User>({ ...user });
@@ -113,7 +127,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     const indirectDownlines = state.users.filter(u => directIds.includes(u.referredBy || ''));
     const userReferrals = state.referrals.filter(r => r.referrerId === user.id);
     
-    const isOnline = user.lastLoginAt && (new Date().getTime() - new Date(user.lastLoginAt).getTime() < 600000);
+    const isOnline = isUserOnline(user);
 
     const handleSave = () => {
       const updatedUsers = state.users.map(u => u.id === user.id ? editData : u);
@@ -152,7 +166,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                   ) : (
                     <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight">{user.fullName}</h2>
                   )}
-                  {isOnline && <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>}
+                  {isOnline ? (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-50 text-green-600 rounded-full border border-green-100">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-[8px] font-black uppercase tracking-widest">Live Now</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full border border-gray-200">
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      <span className="text-[8px] font-black uppercase tracking-widest">Offline</span>
+                    </div>
+                  )}
                   {user.isBanned && <div className="px-2 py-0.5 bg-red-600 text-white rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1"><Ban size={10}/> BANNED</div>}
                 </div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Affiliate ID: {user.id} • @{user.username}</p>
@@ -391,7 +415,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
         {[
           { id: 'activity', label: 'Live Stream', icon: Activity },
-          { id: 'users', label: 'All Affiliates', icon: Users },
+          { id: 'users', label: 'Affiliates', icon: Users, live: liveUsersCount },
           { id: 'withdrawals', label: 'Payout Hub', icon: Wallet, count: state.withdrawals.filter(w => w.status === 'PENDING').length },
           { id: 'memberships', label: 'Activation', icon: Award, count: state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING).length },
           { id: 'complaints', label: 'Tickets', icon: MessageSquare, count: state.complaints.filter(c => c.status === 'PENDING').length }
@@ -399,13 +423,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           <button 
             key={t.id}
             onClick={() => setTab(t.id as any)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap shadow-sm border ${
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap shadow-sm border relative ${
               tab === t.id ? 'bg-malawi-black text-white border-malawi-black' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
             }`}
           >
             <t.icon size={16} />
             {t.label}
             {t.count ? <span className="ml-1 bg-malawi-red text-white px-2 py-0.5 rounded-full text-[9px]">{t.count}</span> : null}
+            {t.live !== undefined && t.live > 0 && (
+              <span className="absolute -top-1 -right-1 bg-green-500 text-white px-2 py-0.5 rounded-full text-[8px] animate-bounce shadow-lg flex items-center gap-1">
+                <Radio size={8} /> {t.live} LIVE
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -445,72 +474,90 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
         {tab === 'users' && (
           <div className="overflow-x-auto">
+             <div className="px-8 py-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white rounded-2xl border flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
+                    <span className="text-xs font-black uppercase tracking-widest text-gray-600">{liveUsersCount} Users Live Now</span>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 bg-gray-300 rounded-full"></div>
+                    <span className="text-xs font-black uppercase tracking-widest text-gray-400">{allUsers.length - liveUsersCount} Offline</span>
+                  </div>
+               </div>
+               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Showing all registered affiliates</p>
+             </div>
              <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400">
+              <thead className="bg-white text-[10px] font-black uppercase text-gray-400">
                 <tr>
-                  <th className="px-8 py-5">Identity</th>
+                  <th className="px-8 py-5">Affiliate</th>
+                  <th className="px-8 py-5">Live Presence</th>
                   <th className="px-8 py-5">Status</th>
-                  <th className="px-8 py-5">Earnings (MWK)</th>
-                  <th className="px-8 py-5">Activity</th>
-                  <th className="px-8 py-5 text-center">Actions</th>
+                  <th className="px-8 py-5">Wallet (MWK)</th>
+                  <th className="px-8 py-5">Track</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {allUsers.map(u => (
-                  <tr key={u.id} className={`hover:bg-gray-50 transition-colors group ${u.isBanned ? 'opacity-50 grayscale bg-red-50/20' : ''}`}>
-                    <td className="px-8 py-5">
-                       <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm ring-2 ring-transparent group-hover:ring-malawi-green transition-all">
-                           {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover" /> : <UserCheck size={20} className="text-gray-300" />}
+                {allUsers.map(u => {
+                  const online = isUserOnline(u);
+                  return (
+                    <tr key={u.id} className={`hover:bg-gray-50 transition-colors group ${u.isBanned ? 'opacity-50 grayscale bg-red-50/20' : ''} ${online ? 'bg-green-50/10' : ''}`}>
+                      <td className="px-8 py-5">
+                         <div className="flex items-center gap-4">
+                           <div className={`w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 shadow-sm transition-all ${online ? 'border-green-500 scale-105' : 'border-white'}`}>
+                             {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover" /> : <UserCheck size={20} className="text-gray-300" />}
+                           </div>
+                           <div>
+                              <p className="font-black text-gray-900 flex items-center gap-2">
+                                {u.fullName}
+                                {u.isBanned && <Ban size={10} className="text-red-600" />}
+                              </p>
+                              <p className="text-[10px] text-gray-400 uppercase font-bold">@{u.username}</p>
+                           </div>
                          </div>
-                         <div>
-                            <p className="font-black text-gray-900 flex items-center gap-2">
-                              {u.fullName}
-                              {u.isBanned && <Ban size={10} className="text-red-600" />}
-                            </p>
-                            <p className="text-[10px] text-gray-400 uppercase font-bold">@{u.username}</p>
+                      </td>
+                      <td className="px-8 py-5">
+                         {online ? (
+                           <div className="flex flex-col gap-0.5 animate-in slide-in-from-left">
+                              <span className="flex items-center gap-1.5 text-green-600 font-black text-[9px] uppercase tracking-widest">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></span>
+                                Online Now
+                              </span>
+                              <span className="text-[8px] text-gray-400 font-bold uppercase ml-3">Viewing Platform</span>
+                           </div>
+                         ) : (
+                           <div className="flex flex-col gap-0.5 opacity-60">
+                              <span className="text-gray-400 font-black text-[9px] uppercase tracking-widest">Offline</span>
+                              <span className="text-[8px] text-gray-400 font-bold uppercase">Seen {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : 'Never'}</span>
+                           </div>
+                         )}
+                      </td>
+                      <td className="px-8 py-5">
+                         <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
+                           u.membershipStatus === MembershipStatus.ACTIVE ? 'bg-green-50 text-green-600' : 
+                           u.membershipStatus === MembershipStatus.PENDING ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'
+                         }`}>
+                           {u.membershipStatus}
+                         </span>
+                      </td>
+                      <td className="px-8 py-5">
+                         <div className="flex flex-col">
+                           <span className="font-black text-malawi-green text-sm">MWK {u.balance.toLocaleString()}</span>
+                           <span className="text-[9px] text-gray-400 font-bold uppercase">Lifetime Rev: {u.totalEarnings.toLocaleString()}</span>
                          </div>
-                       </div>
-                    </td>
-                    <td className="px-8 py-5">
-                       <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
-                         u.membershipStatus === MembershipStatus.ACTIVE ? 'bg-green-50 text-green-600' : 
-                         u.membershipStatus === MembershipStatus.PENDING ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'
-                       }`}>
-                         {u.membershipStatus}
-                       </span>
-                    </td>
-                    <td className="px-8 py-5">
-                       <div className="flex flex-col">
-                         <span className="font-black text-malawi-green text-sm">MWK {u.balance.toLocaleString()}</span>
-                         <span className="text-[9px] text-gray-400 font-bold uppercase">Lifetime: {u.totalEarnings.toLocaleString()}</span>
-                       </div>
-                    </td>
-                    <td className="px-8 py-5">
-                       <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-gray-500 text-[10px]">
-                            <Clock size={12} className="opacity-40" />
-                            <span className="font-bold">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : 'Never'}</span>
-                          </div>
-                          {u.lastLoginAt && (
-                            <div className="flex items-center gap-1.5 text-blue-500 text-[10px]">
-                              <Zap size={10} className="opacity-40" />
-                              <span className="font-black uppercase tracking-tighter">{new Date(u.lastLoginAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                          )}
-                       </div>
-                    </td>
-                    <td className="px-8 py-5 text-center">
-                       <button 
-                         onClick={() => setInspectingUser(u)}
-                         className="p-3 bg-gray-50 hover:bg-malawi-black hover:text-white rounded-2xl transition-all shadow-sm border border-gray-100 flex items-center gap-2 mx-auto"
-                       >
-                         <Eye size={18} />
-                         <span className="text-[9px] font-black uppercase">Track</span>
-                       </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-8 py-5">
+                         <button 
+                           onClick={() => setInspectingUser(u)}
+                           className={`p-3 rounded-2xl transition-all shadow-sm border border-gray-100 flex items-center gap-2 mx-auto ${online ? 'bg-malawi-black text-white' : 'bg-gray-50 text-gray-400 hover:bg-malawi-black hover:text-white'}`}
+                         >
+                           <Eye size={18} />
+                           <span className="text-[9px] font-black uppercase">Inspect</span>
+                         </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
