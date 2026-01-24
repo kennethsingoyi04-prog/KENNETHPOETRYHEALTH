@@ -90,7 +90,9 @@ export interface Complaint {
   userName: string;
   subject: string;
   message: string;
+  imageUrl?: string; // Attachment from user
   reply?: string;
+  replyImageUrl?: string; // Attachment from admin
   status: 'PENDING' | 'RESOLVED';
   createdAt: string;
   updatedAt: string;
