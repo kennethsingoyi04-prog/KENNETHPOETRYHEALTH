@@ -9,7 +9,7 @@ import {
   ImageIcon, CheckCircle2, 
   MessageSquareWarning, Maximize2, Loader2, Database, Trash2,
   Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
-  Copy, ClipboardCheck, Info
+  Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -225,7 +225,7 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                       <div className="relative z-10">
                          <div className="flex items-center gap-4 mb-8">
                             <Rocket size={40} />
-                            <h2 className="text-3xl font-black uppercase tracking-tight">Netlify & Supabase Sync</h2>
+                            <h2 className="text-3xl font-black uppercase tracking-tight">Cloud Sync Status</h2>
                          </div>
                          <p className="text-sm font-bold opacity-80 uppercase leading-relaxed mb-6">
                            Your database is currently optimized for Supabase Free Tier (500MB). We have blocked heavy data transfers to ensure you never pay a cent for bandwidth or storage.
@@ -239,7 +239,7 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                                </div>
                             </div>
                             <div className="bg-white/20 p-4 rounded-2xl">
-                               <p className="text-[10px] font-black uppercase">Sync Health</p>
+                               <p className="text-[10px] font-black uppercase">Handshake</p>
                                <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'CONNECTED' : connStatus === 'TESTING' ? 'TESTING...' : 'DISCONNECTED'}</p>
                             </div>
                          </div>
@@ -248,7 +248,7 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
 
                    <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
                       <div className="flex items-center justify-between mb-8">
-                         <h3 className="text-xl font-black uppercase flex items-center gap-2"><Terminal size={20} /> Supabase SQL Handshake</h3>
+                         <h3 className="text-xl font-black uppercase flex items-center gap-2"><Terminal size={20} /> 1. Database Setup (Supabase)</h3>
                          <button onClick={handleCopySql} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
                             {copiedSql ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
                             {copiedSql ? 'Copied!' : 'Copy SQL'}
@@ -262,18 +262,36 @@ CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_i
                       <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-3 text-blue-800">
                         <Info size={18} className="shrink-0" />
                         <p className="text-[10px] font-bold uppercase leading-relaxed">
-                           Paste this code into the "SQL Editor" on Supabase.com and click "Run". This is required to keep your app free.
+                           Paste this code into the "SQL Editor" on Supabase.com and click "Run". This creates your database tables for free.
                         </p>
                       </div>
                    </div>
 
                    <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Database size={20} /> Netlify Zero-Cost Deployment</h3>
-                      <div className="space-y-4 text-xs font-bold text-gray-500 uppercase">
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">1</span> Open Netlify Dashboard {"->"} Site Configuration</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Go to Environment Variables {"->"} Add Variable</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">3</span> Input your <code className="text-malawi-red">SUPABASE_URL</code> and <code className="text-malawi-red">SUPABASE_KEY</code></p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">4</span> Deploy to start your Free-Forever Affiliate Empire</p>
+                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Key size={20} /> 2. Connection Setup (Netlify)</h3>
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                           <p className="text-xs font-black text-malawi-black uppercase mb-4">Step A: Get Keys from Supabase</p>
+                           <ul className="text-[10px] font-bold text-gray-500 uppercase space-y-2 list-disc ml-4">
+                              <li>Go to <span className="text-malawi-black">Project Settings</span> -> <span className="text-malawi-black">API</span></li>
+                              <li>Copy the <span className="text-malawi-red font-black">Project URL</span></li>
+                              <li>Copy the <span className="text-malawi-red font-black">anon public</span> Key</li>
+                           </ul>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                           <p className="text-xs font-black text-malawi-black uppercase mb-4 flex items-center gap-2"><FileCode size={16} /> Step B: Import into Netlify</p>
+                           <p className="text-[10px] font-bold text-gray-400 uppercase mb-4">
+                             When Netlify asks to "Import Environment Variables" or shows a blank space for ".env contents", paste this:
+                           </p>
+                           <div className="bg-malawi-black p-4 rounded-xl font-mono text-[10px] text-malawi-green space-y-2">
+                              <p>SUPABASE_URL=[Paste your Project URL here]</p>
+                              <p>SUPABASE_KEY=[Paste your anon Key here]</p>
+                           </div>
+                           <p className="mt-4 text-[9px] text-gray-400 font-black uppercase flex items-center gap-2">
+                             <ExternalLink size={12} /> Found in: Netlify Dashboard -> Site Configuration -> Environment Variables
+                           </p>
+                        </div>
                       </div>
                    </div>
                 </div>
