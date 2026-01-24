@@ -52,7 +52,8 @@ CREATE POLICY "Public Upload Access" ON storage.objects FOR INSERT WITH CHECK (b
 CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_id = 'images');`;
 
   const ENV_TEMPLATE = `SUPABASE_URL=[PASTE_YOUR_PROJECT_URL_HERE]
-SUPABASE_KEY=[PASTE_YOUR_ANON_PUBLIC_KEY_HERE]`;
+SUPABASE_KEY=[PASTE_YOUR_ANON_PUBLIC_KEY_HERE]
+API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
 
   useEffect(() => {
     testSupabaseConnection();
@@ -295,7 +296,7 @@ SUPABASE_KEY=[PASTE_YOUR_ANON_PUBLIC_KEY_HERE]`;
                               <pre className="whitespace-pre-wrap">{ENV_TEMPLATE}</pre>
                            </div>
                            <p className="mt-4 text-[9px] text-gray-400 font-black uppercase flex items-center gap-2">
-                             <ExternalLink size={12} /> Found in: Netlify Dashboard -> Site Configuration -> Environment Variables
+                             <ExternalLink size={12} /> Found in: Netlify Dashboard -> Site Configuration -> Environment Variables. **Note: API_KEY is required for the AI Brainstormer.**
                            </p>
                         </div>
                       </div>

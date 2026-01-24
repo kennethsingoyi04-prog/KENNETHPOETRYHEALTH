@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import { AppState, MembershipStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
-// Removed space from import as per guidelines
-import {GoogleGenAI} from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { 
   Users, 
   TrendingUp, 
@@ -19,7 +18,8 @@ import {
   Sparkles,
   Send,
   Loader2,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -52,18 +52,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
     e.preventDefault();
     if (!aiPrompt.trim()) return;
     
+    if (!process.env.API_KEY) {
+      setAiResponse("⚠️ AI Feature Offline: The administrator has not configured the AI API Key in Netlify. Please contact support.");
+      return;
+    }
+
     setIsAskingAI(true);
     setAiResponse(null);
     
     try {
-      // Re-instantiating AI client right before the call as per guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as an expert affiliate marketing mentor specializing in the Malawi market (Blantyre, Lilongwe, Mzuzu, etc.). A user is asking: "${aiPrompt}". Provide specific, actionable advice for the KENNETHPOETRYHEALTH platform. Mention local tactics like using WhatsApp statuses, community gatherings, or local market networking. Keep the response concise and encouraging.`,
       });
       
-      // Accessing text property directly as per guidelines
       setAiResponse(response.text || "I'm sorry, I couldn't generate a response at this time.");
     } catch (err) {
       console.error("AI Marketing Assistant failed", err);
@@ -129,9 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Stats & AI */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
               <div className="bg-blue-50 text-blue-600 p-4 rounded-xl"><Users size={24} /></div>
@@ -156,7 +157,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
             </div>
           </div>
 
-          {/* Referral Link Box */}
           <div className="bg-malawi-black text-white p-8 rounded-3xl relative overflow-hidden shadow-xl">
             <div className="relative z-10 space-y-4">
               <div className="flex items-center gap-2 text-malawi-red font-bold uppercase tracking-widest text-sm">
@@ -179,19 +179,25 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
             <div className="absolute bottom-[-20%] left-[-10%] w-64 h-64 bg-malawi-green/20 rounded-full blur-3xl"></div>
           </div>
 
-          {/* AI Marketing Brainstormer */}
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden ring-1 ring-malawi-green/5">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-malawi-green/5 to-transparent">
               <div className="flex items-center gap-2">
                 <Sparkles className="text-malawi-green" size={20} />
                 <h3 className="font-black text-lg text-malawi-black uppercase tracking-tight">AI Marketing Brainstormer</h3>
               </div>
-              <span className="text-[9px] font-black bg-malawi-green text-white px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
+              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${process.env.API_KEY ? 'bg-malawi-green text-white' : 'bg-red-100 text-red-600'}`}>
+                {process.env.API_KEY ? 'Active' : 'Missing Config'}
+              </span>
             </div>
             <div className="p-6 space-y-4">
               {!aiResponse ? (
                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 text-center">
                    <p className="text-sm text-gray-500 mb-4">Need help finding new affiliates in Malawi? Ask our AI for a local strategy!</p>
+                   {!process.env.API_KEY && (
+                     <div className="mb-4 flex items-center justify-center gap-2 text-red-600 font-bold text-xs uppercase">
+                        <ShieldAlert size={14} /> Admin must set API_KEY in Netlify
+                     </div>
+                   )}
                    <div className="flex flex-wrap gap-2 justify-center">
                       {["How to use WhatsApp Status?", "Pitch for Blantyre markets", "How to explain commissions?"].map(hint => (
                         <button key={hint} onClick={() => setAiPrompt(hint)} className="text-[10px] font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:border-malawi-green hover:text-malawi-green transition-all">{hint}</button>
@@ -231,7 +237,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
           </div>
         </div>
 
-        {/* Right Column - Activity */}
         <div className="space-y-6">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
