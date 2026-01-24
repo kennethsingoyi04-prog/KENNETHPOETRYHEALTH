@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { AppState, PaymentMethod, WithdrawalStatus, WithdrawalRequest } from '../types';
 import { MIN_WITHDRAWAL } from '../constants';
-import { Wallet, Info, Upload, CheckCircle, Smartphone, FileImage } from 'lucide-react';
+import { Wallet, Info, Upload, CheckCircle, Smartphone, FileImage, Loader2, AlertCircle } from 'lucide-react';
 import { notifyWithdrawalRequest } from '../services/NotificationService';
+import { GoogleGenAI } from "@google/genai";
 
 interface WithdrawProps {
   state: AppState;
@@ -17,8 +18,69 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
   const [whatsapp, setWhatsapp] = useState(user.whatsapp);
   const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.AIRTEL_MONEY);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofBase64, setProofBase64] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{ valid: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const verifyIDWithAI = async (base64Data: string) => {
+    setIsVerifying(true);
+    setVerificationResult(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const base64Content = base64Data.split(',')[1];
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: base64Content
+                }
+              },
+              {
+                text: "Analyze this image. Is it a valid identity document (such as a National ID card, Passport, or Driver's License)? If it looks like a person's identity document, respond with ONLY the word 'VALID'. If it is not an ID (e.g., it is a photo of a landscape, a person, text, or a random object), respond with 'INVALID: [short reason]'."
+              }
+            ]
+          }
+        ]
+      });
+
+      const result = response.text?.trim() || "INVALID: Unable to verify";
+      if (result === 'VALID') {
+        setVerificationResult({ valid: true, message: "ID document looks valid." });
+      } else {
+        setVerificationResult({ 
+          valid: false, 
+          message: result.startsWith('INVALID:') ? result.replace('INVALID:', '').trim() : "This does not appear to be a valid identity document." 
+        });
+      }
+    } catch (err) {
+      console.error("AI ID Verification failed", err);
+      setVerificationResult({ valid: true, message: "Manual verification required by admin." });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProofFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setProofBase64(result);
+        verifyIDWithAI(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,21 +96,18 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
       return;
     }
 
-    setIsSubmitting(true);
+    if (!proofBase64) {
+      alert('Please upload a proof of ID');
+      return;
+    }
 
-    let finalProofUrl: string | undefined = undefined;
-
-    if (proofFile) {
-      try {
-        finalProofUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(proofFile);
-        });
-      } catch (e) {
-        console.error("Failed to process proof image", e);
+    if (verificationResult && !verificationResult.valid) {
+      if (!window.confirm("Our system flagged this document as potentially invalid. Submitting false documents can get your account banned. Continue?")) {
+        return;
       }
     }
+
+    setIsSubmitting(true);
 
     // Simulate request creation
     const newRequest: WithdrawalRequest = {
@@ -61,7 +120,7 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
       paymentMethod: method,
       status: WithdrawalStatus.PENDING,
       createdAt: new Date().toISOString(),
-      proofUrl: finalProofUrl
+      proofUrl: proofBase64
     };
 
     const updatedUser = {
@@ -85,6 +144,8 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
       setSuccess(true);
       setAmount('');
       setProofFile(null);
+      setProofBase64(null);
+      setVerificationResult(null);
     }, 1200);
   };
 
@@ -209,20 +270,35 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
 
         <div className="space-y-2">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identity Verification (Upload ID)</label>
-          <div className="border-2 border-dashed border-gray-200 rounded-3xl p-10 flex flex-col items-center justify-center text-gray-400 hover:border-malawi-green hover:bg-green-50/30 transition-all cursor-pointer relative group">
+          <div className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center relative transition-all group overflow-hidden ${
+             verificationResult?.valid === false ? 'border-red-300 bg-red-50/30' : 
+             verificationResult?.valid === true ? 'border-green-300 bg-green-50/30' : 
+             'border-gray-200 hover:bg-green-50/30 hover:border-malawi-green'
+          }`}>
             <input 
               type="file" 
-              className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+              className="absolute inset-0 opacity-0 cursor-pointer z-20" 
               accept="image/*"
-              onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+              onChange={handleFileChange}
+              disabled={isVerifying}
             />
-            {proofFile ? (
+            {isVerifying ? (
+              <div className="flex flex-col items-center gap-3 animate-pulse">
+                <Loader2 className="animate-spin text-malawi-green" size={32} />
+                <p className="text-xs font-black uppercase tracking-widest text-malawi-green">Analyzing Document...</p>
+              </div>
+            ) : proofBase64 ? (
               <div className="flex flex-col items-center gap-2 animate-in zoom-in">
                 <div className="bg-malawi-green text-white p-3 rounded-2xl shadow-lg">
                   <FileImage size={32} />
                 </div>
-                <p className="text-sm font-bold text-gray-700">{proofFile.name}</p>
-                <p className="text-[10px] uppercase font-black text-malawi-green">Click to replace file</p>
+                <p className="text-sm font-bold text-gray-700">{proofFile?.name}</p>
+                {verificationResult?.valid ? (
+                   <p className="text-[10px] font-black text-malawi-green uppercase tracking-widest flex items-center gap-1"><CheckCircle size={12}/> Verified ID Format</p>
+                ) : verificationResult?.valid === false ? (
+                   <p className="text-[10px] font-black text-malawi-red uppercase tracking-widest flex items-center gap-1"><AlertCircle size={12}/> {verificationResult.message}</p>
+                ) : null}
+                <p className="text-[9px] uppercase font-black text-gray-400">Click to replace file</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 group-hover:scale-105 transition-transform">
@@ -235,9 +311,9 @@ const Withdraw: React.FC<WithdrawProps> = ({ state, onStateUpdate }) => {
         </div>
 
         <button 
-          disabled={isSubmitting}
+          disabled={isSubmitting || isVerifying || !proofBase64}
           className={`w-full py-5 rounded-2xl text-white font-black uppercase tracking-widest text-xs shadow-xl transition-all flex items-center justify-center gap-2 ${
-            isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-malawi-black hover:bg-gray-800 hover:scale-[1.01] active:scale-[0.99] shadow-black/20'
+            isSubmitting || isVerifying ? 'bg-gray-400 cursor-not-allowed' : 'bg-malawi-black hover:bg-gray-800 hover:scale-[1.01] active:scale-[0.99] shadow-black/20'
           }`}
         >
           {isSubmitting ? (

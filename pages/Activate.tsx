@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { AppState, MembershipTier, MembershipStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
-import { Upload, Info, MessageSquare, ExternalLink, ShieldCheck, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { Upload, Info, MessageSquare, ExternalLink, ShieldCheck, CheckCircle2, Loader2, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 interface ActivateProps {
   state: AppState;
@@ -16,16 +17,68 @@ const Activate: React.FC<ActivateProps> = ({ state, onStateUpdate }) => {
   
   const [selectedTier, setSelectedTier] = useState<MembershipTier>(MembershipTier.BRONZE);
   const [membershipProof, setMembershipProof] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{ valid: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!user) return <Navigate to="/auth" />;
   if (user.membershipStatus === MembershipStatus.ACTIVE) return <Navigate to="/dashboard" />;
 
+  const verifyImageWithAI = async (base64Data: string) => {
+    setIsVerifying(true);
+    setVerificationResult(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Remove data:image/png;base64, prefix
+      const base64Content = base64Data.split(',')[1];
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: base64Content
+                }
+              },
+              {
+                text: "Analyze this image. Is it a screenshot of a mobile money payment receipt (specifically Airtel Money or TNM Mpamba from Malawi)? Check for keywords like 'Transaction ID', 'Airtel', 'Mpamba', 'Trans ID', or 'Successful'. If it is a valid receipt, reply with ONLY the word 'VALID'. If it is not a receipt (e.g., it's a random photo, a blank screen, or an unrelated document), reply with 'INVALID: [short reason]'."
+              }
+            ]
+          }
+        ]
+      });
+
+      const result = response.text?.trim() || "INVALID: Unable to verify";
+      if (result === 'VALID') {
+        setVerificationResult({ valid: true, message: "Receipt looks genuine. You can now submit." });
+      } else {
+        setVerificationResult({ 
+          valid: false, 
+          message: result.startsWith('INVALID:') ? result.replace('INVALID:', '').trim() : "This does not appear to be a valid mobile money receipt." 
+        });
+      }
+    } catch (err) {
+      console.error("AI Verification failed", err);
+      // Fallback if AI fails, but let the user proceed with a warning
+      setVerificationResult({ valid: true, message: "Verification unavailable, but you can proceed at your own risk." });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setMembershipProof(reader.result as string);
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setMembershipProof(result);
+        verifyImageWithAI(result);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -35,6 +88,12 @@ const Activate: React.FC<ActivateProps> = ({ state, onStateUpdate }) => {
     if (!membershipProof) {
       alert("Please upload proof of payment to proceed.");
       return;
+    }
+
+    if (verificationResult && !verificationResult.valid) {
+      if (!window.confirm("Our AI suggests this might not be a valid receipt. False submissions may lead to account suspension. Are you sure you want to proceed?")) {
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -129,23 +188,33 @@ const Activate: React.FC<ActivateProps> = ({ state, onStateUpdate }) => {
                  <ExternalLink size={18} /> Visit Official Website
               </a>
             </div>
-            <p className="text-[9px] text-blue-400 font-black text-center uppercase tracking-widest">
-              * Beware of impersonators. Only use official links.
-            </p>
           </div>
 
           <form onSubmit={handleActivate} className="space-y-6">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Upload Payment Receipt</label>
-              <div className="border-2 border-dashed border-gray-200 rounded-3xl p-10 flex flex-col items-center justify-center relative cursor-pointer hover:bg-gray-50 transition-all group overflow-hidden">
-                <input type="file" required accept="image/*" onChange={handleProofUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
-                {membershipProof ? (
+              <div className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center relative cursor-pointer transition-all group overflow-hidden ${
+                verificationResult?.valid === false ? 'border-red-300 bg-red-50/30' : 
+                verificationResult?.valid === true ? 'border-green-300 bg-green-50/30' : 
+                'border-gray-200 hover:bg-gray-50'
+              }`}>
+                <input type="file" required accept="image/*" onChange={handleProofUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" disabled={isVerifying} />
+                {isVerifying ? (
+                  <div className="flex flex-col items-center gap-3 animate-in fade-in">
+                    <Loader2 className="animate-spin text-malawi-green" size={32} />
+                    <p className="text-xs font-black uppercase tracking-widest text-malawi-green">AI Scanning Receipt...</p>
+                  </div>
+                ) : membershipProof ? (
                   <div className="flex flex-col items-center gap-3 animate-in zoom-in">
                      <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-2xl border-2 border-white">
                        <img src={membershipProof} alt="Proof" className="w-full h-full object-cover" />
                      </div>
                      <div className="text-center">
-                        <p className="text-[10px] font-black text-malawi-green uppercase tracking-widest">Receipt Captured!</p>
+                        {verificationResult?.valid ? (
+                          <p className="text-[10px] font-black text-malawi-green uppercase tracking-widest flex items-center justify-center gap-1"><CheckCircle2 size={12}/> Verified Receipt</p>
+                        ) : verificationResult?.valid === false ? (
+                          <p className="text-[10px] font-black text-malawi-red uppercase tracking-widest flex items-center justify-center gap-1"><AlertCircle size={12}/> {verificationResult.message}</p>
+                        ) : null}
                         <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Click to Replace</p>
                      </div>
                   </div>
@@ -164,9 +233,9 @@ const Activate: React.FC<ActivateProps> = ({ state, onStateUpdate }) => {
             </div>
 
             <button 
-              disabled={isSubmitting || !membershipProof}
+              disabled={isSubmitting || !membershipProof || isVerifying}
               className={`w-full py-5 rounded-2xl text-white font-black uppercase tracking-widest text-xs shadow-2xl transition-all flex items-center justify-center gap-3 ${
-                isSubmitting ? 'bg-gray-400' : 'bg-malawi-green hover:bg-green-700 active:scale-[0.98] shadow-green-500/20'
+                isSubmitting || isVerifying ? 'bg-gray-400' : 'bg-malawi-green hover:bg-green-700 active:scale-[0.98] shadow-green-500/20'
               }`}
             >
               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
