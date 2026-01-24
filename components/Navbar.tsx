@@ -13,26 +13,43 @@ import {
   MessageSquareWarning,
   Zap,
   ChevronRight,
-  ImageIcon
+  ImageIcon,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User | null;
   onLogout: () => void;
+  isOnline?: boolean;
   complaintsCount?: number;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount = 0 }) => {
+const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, isOnline = false, complaintsCount = 0 }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isInactive = currentUser?.membershipStatus === MembershipStatus.INACTIVE;
 
+  const CloudIndicator = () => (
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+      isOnline ? 'bg-green-500/10 border-green-500/20 text-green-600' : 'bg-red-500/10 border-red-500/20 text-red-600'
+    }`}>
+      {isOnline ? <Cloud size={12} className="animate-pulse" /> : <CloudOff size={12} />}
+      <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">
+        {isOnline ? 'Sync Active' : 'Offline'}
+      </span>
+    </div>
+  );
+
   if (!currentUser) return (
     <nav className="bg-white text-malawi-black p-4 border-b border-gray-100 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto flex justify-between items-center">
-        <Link to="/">
-          <Logo variant="dark" />
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to="/">
+            <Logo variant="dark" />
+          </Link>
+          <CloudIndicator />
+        </div>
         <div className="flex items-center gap-4">
            <button 
              onClick={() => navigate('/auth?type=login')} 
@@ -83,7 +100,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
     <>
       <nav className="bg-malawi-black text-white p-4 shadow-lg sticky top-0 z-50 border-b-4 border-malawi-red hidden md:block">
         <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6">
             <Link to={isInactive ? "/activate" : "/dashboard"}>
                <Logo size="md" variant="light" />
             </Link>
@@ -107,12 +124,13 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-right mr-4">
-              <p className="text-xs text-gray-400">Balance</p>
+            <CloudIndicator />
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 uppercase font-black">Balance</p>
               <p className="text-sm font-bold text-malawi-green">MWK {currentUser.balance.toLocaleString()}</p>
             </div>
             
-            <Link to="/profile" className="w-10 h-10 rounded-full border-2 border-malawi-green overflow-hidden bg-gray-800 flex items-center justify-center">
+            <Link to="/profile" className="w-10 h-10 rounded-full border-2 border-malawi-green overflow-hidden bg-gray-800 flex items-center justify-center ml-2">
               {currentUser.profilePic ? (
                 <img src={currentUser.profilePic} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -125,7 +143,6 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, complaintsCount 
               className="flex items-center gap-2 bg-malawi-red/10 hover:bg-malawi-red text-malawi-red hover:text-white px-4 py-2 rounded-xl transition-all border border-malawi-red/20 font-black uppercase text-[10px] tracking-widest"
             >
               <LogOut size={18} />
-              <span className="hidden lg:inline">Logout</span>
             </button>
           </div>
         </div>

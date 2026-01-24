@@ -111,27 +111,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="flex items-center gap-4 text-blue-600">
              <Server size={40} className="shrink-0" />
              <div>
-               <h2 className="text-xl font-black uppercase tracking-tight">Database Initialization Required</h2>
-               <p className="text-sm font-bold opacity-80">Your Supabase client is connected, but the table is missing.</p>
+               <h2 className="text-xl font-black uppercase tracking-tight">Database Connectivity Error</h2>
+               <p className="text-sm font-bold opacity-80">Connected to Client, but Table or Permissions missing.</p>
              </div>
            </div>
            
            <div className="bg-white p-6 rounded-3xl space-y-4 shadow-inner border border-blue-100">
              <h3 className="font-black text-xs uppercase text-gray-400">Run this in your Supabase SQL Editor:</h3>
-             <pre className="bg-gray-900 text-green-400 p-4 rounded-xl text-[10px] font-mono overflow-x-auto">
+             <pre className="bg-gray-900 text-green-400 p-4 rounded-xl text-[10px] font-mono overflow-x-auto select-all">
 {`CREATE TABLE IF NOT EXISTS app_state (
   id TEXT PRIMARY KEY,
   data JSONB,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Realtime for this table
+-- Crucial: This allows your app to read/write without complex setup
+ALTER TABLE app_state DISABLE ROW LEVEL SECURITY;
+
+-- Enable Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE app_state;`}
              </pre>
            </div>
            
            <button onClick={runHealthCheck} className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-             <RefreshCw size={16} /> Re-Check Connection
+             <RefreshCw size={16} /> Re-Check Database Status
            </button>
         </div>
       )}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
@@ -14,14 +14,14 @@ import Activate from './pages/Activate';
 import ImageLab from './pages/ImageLab';
 import Navbar from './components/Navbar';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
-import { syncAppStateToCloud, fetchAppStateFromCloud } from './dataService';
+import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth } from './dataService';
 
 const STORAGE_KEY = 'kph_v7_final_storage';
 
 const App: React.FC = () => {
   const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
   
-  // 1. Initial State from LocalStorage (fastest load)
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -57,41 +57,42 @@ const App: React.FC = () => {
     };
   });
 
-  // 2. Fetch from Supabase and Merge
+  // Initialize Cloud
   useEffect(() => {
     const initCloud = async () => {
-      const cloudData = await fetchAppStateFromCloud();
-      if (cloudData) {
-        setState(prev => {
-          // Merge logic: Prioritize newer users and referrals from cloud
-          // but keep the current local user session
-          return {
+      // 1. Check if Supabase is reachable
+      const health = await checkCloudHealth();
+      setIsOnline(health.ok);
+
+      if (health.ok) {
+        const cloudData = await fetchAppStateFromCloud();
+        if (cloudData) {
+          setState(prev => ({
             ...prev,
-            users: cloudData.users || prev.users,
-            withdrawals: cloudData.withdrawals || prev.withdrawals,
-            referrals: cloudData.referrals || prev.referrals,
-            complaints: cloudData.complaints || prev.complaints,
-            systemSettings: cloudData.systemSettings || prev.systemSettings,
-            currentUser: prev.currentUser // Critical: preserve current session
-          };
-        });
+            ...cloudData,
+            currentUser: prev.currentUser // Preserve session
+          }));
+        } else {
+          // SEEDING: If cloud is empty, push the local owner account up immediately
+          await syncAppStateToCloud(state);
+        }
       }
       setIsCloudLoaded(true);
     };
     initCloud();
   }, []);
 
-  // 3. Persistent Synchronization
+  // Periodic Auto-Sync
   useEffect(() => {
-    // Save to LocalStorage for offline/instant access
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     
-    // Sync to Cloud whenever state changes and cloud is initialized
-    if (isCloudLoaded) {
-      const timer = setTimeout(() => syncAppStateToCloud(state), 1500);
+    if (isCloudLoaded && isOnline) {
+      const timer = setTimeout(() => {
+        syncAppStateToCloud(state);
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [state, isCloudLoaded]);
+  }, [state, isCloudLoaded, isOnline]);
 
   const login = (identifier: string, password?: string) => {
     const user = state.users.find(u => 
@@ -119,6 +120,7 @@ const App: React.FC = () => {
         <Navbar 
           currentUser={state.currentUser} 
           onLogout={logout} 
+          isOnline={isOnline}
           complaintsCount={state.complaints.filter(c => c.status === 'PENDING').length} 
         />
         <main className="container mx-auto px-4 py-6">
