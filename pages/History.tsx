@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
 import { AppState, WithdrawalStatus } from '../types';
-import { Download, Clock, CheckCircle2, XCircle, FileText, Info, Loader2, Image as ImageIcon, Receipt } from 'lucide-react';
+import { Download, Clock, CheckCircle2, XCircle, FileText, Info, Loader2, Image as ImageIcon, Receipt, X, Maximize2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { useNavigate } from 'react-router-dom';
 
 interface HistoryProps {
   state: AppState;
@@ -12,10 +11,9 @@ interface HistoryProps {
 
 const History: React.FC<HistoryProps> = ({ state }) => {
   const user = state.currentUser!;
-  const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
   const myWithdrawals = state.withdrawals.filter(w => w.userId === user.id);
-  const myEarnings = state.referrals.filter(r => r.referrerId === user.id);
 
   const getStatusBadge = (status: WithdrawalStatus) => {
     switch (status) {
@@ -26,11 +24,6 @@ const History: React.FC<HistoryProps> = ({ state }) => {
       case WithdrawalStatus.REJECTED:
         return <span className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase"><XCircle size={12} /> Rejected</span>;
     }
-  };
-
-  const viewImage = (url?: string) => {
-    if (!url) return;
-    navigate(`/admin/proof-preview?url=${encodeURIComponent(url)}`);
   };
 
   const handleDownloadStatement = () => {
@@ -54,10 +47,6 @@ const History: React.FC<HistoryProps> = ({ state }) => {
       doc.setFontSize(12);
       doc.text('Account Holder: ' + user.fullName, 20, 55);
       doc.text('Date: ' + new Date().toLocaleDateString(), 140, 55);
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(20, 75, pageWidth - 40, 25, 3, 3, 'F');
-      doc.setFontSize(10);
-      doc.text('CURRENT BALANCE: MWK ' + user.balance.toLocaleString(), 30, 93);
       doc.autoTable({
         startY: 120,
         head: [['Date', 'Amount', 'Method', 'Status']],
@@ -74,6 +63,13 @@ const History: React.FC<HistoryProps> = ({ state }) => {
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-700">
+      {viewingProofUrl && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
+          <button onClick={() => setViewingProofUrl(null)} className="absolute top-6 right-6 p-4 bg-malawi-red text-white rounded-full shadow-xl active:scale-95 transition-all"><X size={24} /></button>
+          <img src={viewingProofUrl} className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain ring-4 ring-white/10" alt="HD Proof" />
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-malawi-black uppercase tracking-tight">Transaction Ledger</h1>
@@ -110,32 +106,27 @@ const History: React.FC<HistoryProps> = ({ state }) => {
                 <tbody className="divide-y">
                   {myWithdrawals.map((w) => (
                     <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-8 py-6 whitespace-nowrap">
+                      <td className="px-8 py-6">
                          <p className="font-bold text-gray-900">{new Date(w.createdAt).toLocaleDateString()}</p>
                          <p className="text-[10px] text-gray-400 uppercase font-black">{w.id}</p>
                       </td>
                       <td className="px-8 py-6">
                          <p className="text-lg font-black text-malawi-green">MWK {w.amount.toLocaleString()}</p>
-                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{w.paymentMethod}</p>
+                         <p className="text-[9px] font-black text-gray-400 uppercase">{w.paymentMethod}</p>
                       </td>
                       <td className="px-8 py-6">
                         {w.status === WithdrawalStatus.APPROVED && w.paymentProofUrl ? (
-                          <button 
-                            onClick={() => viewImage(w.paymentProofUrl)} 
-                            className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all shadow-md active:scale-95"
-                          >
+                          <button onClick={() => setViewingProofUrl(w.paymentProofUrl || null)} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-95 shadow-md">
                             <ImageIcon size={14} /> View Receipt
                           </button>
                         ) : w.status === WithdrawalStatus.APPROVED ? (
                           <span className="text-[9px] font-black text-gray-400 uppercase italic">Contact Support</span>
-                        ) : (
-                          <span className="text-[9px] font-black text-gray-300 uppercase italic">---</span>
-                        )}
+                        ) : '---'}
                       </td>
                       <td className="px-8 py-6">
                          <div className="flex flex-col gap-1">
                             {getStatusBadge(w.status)}
-                            {w.adminNote && <p className="text-[9px] text-gray-400 font-bold uppercase truncate max-w-[150px]">Note: {w.adminNote}</p>}
+                            {w.adminNote && <p className="text-[9px] text-gray-400 font-bold uppercase truncate max-w-[150px]">Ref: {w.adminNote}</p>}
                          </div>
                       </td>
                     </tr>
