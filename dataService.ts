@@ -28,6 +28,30 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
 };
 
 /**
+ * Uploads an image file to Supabase Storage and returns the public URL.
+ * Helps prevent "Bandwidth Overlimit" issues by storing heavy files outside the JSON state.
+ */
+export const uploadImage = async (file: File, folder: string): Promise<string | null> => {
+  try {
+    const fileName = `${folder}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+    const { data, error } = await supabase.storage
+      .from('images')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+    if (error) throw error;
+
+    const { data: urlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(data.path);
+
+    return urlData.publicUrl;
+  } catch (err) {
+    console.error('Storage Upload Error:', err);
+    return null;
+  }
+};
+
+/**
  * Syncs the local state to Supabase.
  * Stores system-wide data (users, referrals, withdrawals) in a single master row.
  */
@@ -35,7 +59,6 @@ export const syncAppStateToCloud = async (state: AppState) => {
   if (!state.users || state.users.length === 0) return;
 
   // We exclude 'currentUser' from the cloud because it's a transient session variable
-  // Each device has its own logged in user.
   const { currentUser, ...persistentData } = state;
 
   try {
@@ -65,7 +88,7 @@ export const fetchAppStateFromCloud = async (): Promise<Partial<AppState> | null
       .from('app_state')
       .select('data')
       .eq('id', 'main_storage')
-      .maybeSingle(); // Better than .single() as it doesn't throw if empty
+      .maybeSingle();
 
     if (error) {
       console.error('Fetch error:', error.message);
