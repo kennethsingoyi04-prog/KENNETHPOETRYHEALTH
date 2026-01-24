@@ -1,15 +1,14 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { AppState, WithdrawalStatus, WithdrawalRequest, PaymentMethod, User, UserRole, MembershipStatus, Complaint, Referral } from '../types';
-import { MALAWI_COLORS, MEMBERSHIP_TIERS } from '../constants';
-import { checkCloudHealth } from '../dataService';
+import { AppState, WithdrawalStatus, MembershipStatus, Complaint, User, WithdrawalRequest } from '../types';
+import { MEMBERSHIP_TIERS } from '../constants';
+import { checkCloudHealth, CloudStatus, syncAppStateToCloud } from '../dataService';
 import { 
-  Users, Wallet, CheckCircle, XCircle, Search, PieChart as PieIcon, MessageSquare, Check, Activity, FileSpreadsheet,
-  Filter, Edit2, Image as ImageIcon, ShieldCheck, Send, Loader2, ArrowUpDown, X, ExternalLink, Crown, UserPlus,
-  Settings, AlertTriangle, Calendar, RotateCcw, DollarSign, Cloud, CloudOff
+  ShieldCheck, Loader2, AlertTriangle, 
+  Cloud, CloudOff, Database, RefreshCw, Check, Search, Flame, Server,
+  UserCheck, MessageSquare, Eye, X, CheckCircle2, Wallet, ExternalLink
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface AdminDashboardProps {
   state: AppState;
@@ -17,186 +16,176 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate }) => {
-  const currentUser = state.currentUser!;
-  const isOwner = currentUser.isOwner === true;
-  const [tab, setTab] = useState<'withdrawals' | 'memberships' | 'complaints' | 'team' | 'users'>('withdrawals');
-  const [cloudStatus, setCloudStatus] = useState<'checking' | 'online' | 'error'>('checking');
-  
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<'withdrawals' | 'memberships' | 'complaints' | 'users'>('withdrawals');
+  const [cloudInfo, setCloudInfo] = useState<CloudStatus>({ ok: false, isCloud: true });
+  const [isChecking, setIsChecking] = useState(true);
   const [searchText, setSearchText] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [minAmount, setMinAmount] = useState<string>("");
-  const [maxAmount, setMaxAmount] = useState<string>("");
+  const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+
+  const runHealthCheck = async () => {
+    setIsChecking(true);
+    const info = await checkCloudHealth();
+    setCloudInfo(info);
+    setIsChecking(false);
+  };
 
   useEffect(() => {
-    const check = async () => {
-      const ok = await checkCloudHealth();
-      setCloudStatus(ok ? 'online' : 'error');
-    };
-    check();
-    const interval = setInterval(check, 30000);
-    return () => clearInterval(interval);
+    runHealthCheck();
   }, []);
 
-  const resetFilters = () => {
-    setSearchText(""); setStartDate(""); setEndDate(""); setStatusFilter("ALL"); setMinAmount(""); setMaxAmount("");
+  const handleManualSync = async () => {
+    setIsChecking(true);
+    await syncAppStateToCloud(state);
+    await runHealthCheck();
   };
 
-  const [replyTicket, setReplyTicket] = useState<Complaint | null>(null);
-  const [adminReply, setAdminReply] = useState('');
-  const [isSendingReply, setIsSendingReply] = useState(false);
-
-  const staffAdmins = state.users.filter(u => u.role === 'ADMIN' && !u.isOwner);
-
-  const dateInRange = (dateStr: string) => {
-    if (!startDate && !endDate) return true;
-    const date = new Date(dateStr).getTime();
-    const start = startDate ? new Date(startDate).getTime() : -Infinity;
-    const end = endDate ? new Date(endDate).getTime() : Infinity;
-    return date >= start && date <= end;
-  };
-
+  // --- Filtered Lists ---
   const filteredWithdrawals = useMemo(() => {
-    return state.withdrawals.filter(w => {
-      const matchesSearch = w.userName.toLowerCase().includes(searchText.toLowerCase()) || w.phone.includes(searchText);
-      const matchesStatus = statusFilter === "ALL" || w.status === statusFilter;
-      const matchesMin = minAmount === "" || w.amount >= parseFloat(minAmount);
-      const matchesMax = maxAmount === "" || w.amount <= parseFloat(maxAmount);
-      return matchesSearch && matchesStatus && matchesMin && matchesMax && dateInRange(w.createdAt);
-    });
-  }, [state.withdrawals, searchText, statusFilter, minAmount, maxAmount, startDate, endDate]);
+    return state.withdrawals.filter(w => 
+      w.userName.toLowerCase().includes(searchText.toLowerCase()) || 
+      w.phone.includes(searchText)
+    );
+  }, [state.withdrawals, searchText]);
 
-  const filteredMemberships = useMemo(() => {
-    return state.users.filter(u => {
-      const isPending = u.membershipStatus === MembershipStatus.PENDING;
-      const matchesSearch = u.fullName.toLowerCase().includes(searchText.toLowerCase()) || u.username.toLowerCase().includes(searchText.toLowerCase());
-      return isPending && matchesSearch && dateInRange(u.createdAt);
-    });
-  }, [state.users, searchText, startDate, endDate]);
+  const pendingMemberships = useMemo(() => {
+    return state.users.filter(u => 
+      u.membershipStatus === MembershipStatus.PENDING &&
+      (u.fullName.toLowerCase().includes(searchText.toLowerCase()) || u.username.toLowerCase().includes(searchText.toLowerCase()))
+    );
+  }, [state.users, searchText]);
 
-  const filteredComplaints = useMemo(() => {
-    return state.complaints.filter(c => {
-      const matchesSearch = c.userName.toLowerCase().includes(searchText.toLowerCase()) || c.subject.toLowerCase().includes(searchText.toLowerCase());
-      const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
-      return matchesSearch && matchesStatus && dateInRange(c.createdAt);
-    });
-  }, [state.complaints, searchText, statusFilter, startDate, endDate]);
+  const pendingComplaints = useMemo(() => {
+    return state.complaints.filter(c => 
+      c.status === 'PENDING' &&
+      (c.userName.toLowerCase().includes(searchText.toLowerCase()) || c.subject.toLowerCase().includes(searchText.toLowerCase()))
+    );
+  }, [state.complaints, searchText]);
 
-  const filteredUsers = useMemo(() => {
-    return state.users.filter(u => {
-      if (u.role !== 'USER') return false;
-      const matchesSearch = u.fullName.toLowerCase().includes(searchText.toLowerCase()) || u.username.toLowerCase().includes(searchText.toLowerCase());
-      const matchesStatus = statusFilter === "ALL" || u.membershipStatus === statusFilter;
-      return matchesSearch && matchesStatus && dateInRange(u.createdAt);
-    });
-  }, [state.users, searchText, statusFilter, startDate, endDate]);
+  const allUsers = useMemo(() => {
+    return state.users.filter(u => 
+      u.fullName.toLowerCase().includes(searchText.toLowerCase()) || 
+      u.username.toLowerCase().includes(searchText.toLowerCase()) ||
+      u.phone.includes(searchText)
+    );
+  }, [state.users, searchText]);
 
-  const filteredStaff = useMemo(() => staffAdmins.filter(u => u.fullName.toLowerCase().includes(searchText.toLowerCase())), [staffAdmins, searchText]);
-
+  // --- Actions ---
   const handleWithdrawalAction = (id: string, status: WithdrawalStatus) => {
     const updatedWithdrawals = state.withdrawals.map(w => w.id === id ? { ...w, status } : w);
     onStateUpdate({ withdrawals: updatedWithdrawals });
   };
 
   const handleMembershipAction = (userId: string, status: MembershipStatus) => {
-    if (status === MembershipStatus.ACTIVE) {
-      const userToActivate = state.users.find(u => u.id === userId);
-      if (userToActivate) {
-        const tierPrice = MEMBERSHIP_TIERS.find(t => t.tier === userToActivate.membershipTier)?.price || 0;
-        let updatedUsers = [...state.users];
-        let newReferrals = [...state.referrals];
-        if (userToActivate.referredBy) {
-          const l1Referrer = updatedUsers.find(u => u.id === userToActivate.referredBy);
-          if (l1Referrer) {
-            const l1TierConfig = MEMBERSHIP_TIERS.find(t => t.tier === l1Referrer.membershipTier);
-            const l1Rate = l1TierConfig ? l1TierConfig.directCommission : 30;
-            const l1Commission = (tierPrice * l1Rate) / 100;
-            updatedUsers = updatedUsers.map(u => u.id === l1Referrer.id ? { ...u, balance: u.balance + l1Commission, totalEarnings: u.totalEarnings + l1Commission } : u);
-            newReferrals.push({ id: `ref-${Date.now()}-L1`, referrerId: l1Referrer.id, referredId: userId, level: 1, commission: l1Commission, timestamp: new Date().toISOString() });
-          }
-        }
-        updatedUsers = updatedUsers.map(u => u.id === userId ? { ...u, membershipStatus: status } : u);
-        onStateUpdate({ users: updatedUsers, referrals: newReferrals });
-      }
-    } else {
-      const updatedUsers = state.users.map(u => u.id === userId ? { ...u, membershipStatus: status } : u);
-      onStateUpdate({ users: updatedUsers });
-    }
+    const updatedUsers = state.users.map(u => 
+      u.id === userId ? { ...u, membershipStatus: status } : u
+    );
+    onStateUpdate({ users: updatedUsers });
   };
 
-  const handleSendReply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyTicket || !adminReply.trim()) return;
-    setIsSendingReply(true);
-    const updatedComplaints = state.complaints.map(c => c.id === replyTicket.id ? { ...c, reply: adminReply.trim(), status: 'RESOLVED' as const, updatedAt: new Date().toISOString() } : c);
-    setTimeout(() => { onStateUpdate({ complaints: updatedComplaints }); setIsSendingReply(false); setReplyTicket(null); setAdminReply(''); }, 1000);
+  const handleReplyComplaint = (id: string) => {
+    const reply = replyText[id];
+    if (!reply?.trim()) return;
+
+    const updatedComplaints = state.complaints.map(c => 
+      c.id === id ? { ...c, reply, status: 'RESOLVED' as const, updatedAt: new Date().toISOString() } : c
+    );
+    onStateUpdate({ complaints: updatedComplaints });
+    setReplyText(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const viewProof = (url?: string) => {
+    if (!url) return;
+    navigate(`/admin/proof-preview?url=${encodeURIComponent(url)}`);
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {replyTicket && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="bg-malawi-black p-6 text-white flex justify-between items-center">
-              <div><h2 className="text-xl font-black uppercase">Support Verdict</h2><p className="text-[10px] text-gray-400">Replying to {replyTicket.userName}</p></div>
-              <button onClick={() => setReplyTicket(null)}><X size={20} /></button>
-            </div>
-            <div className="p-8 space-y-6">
-               <div className="bg-gray-50 p-4 rounded-2xl text-sm italic border border-gray-100">"{replyTicket.message}"</div>
-               <form onSubmit={handleSendReply} className="space-y-4">
-                 <textarea required rows={4} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" placeholder="Enter response..." value={adminReply} onChange={(e) => setAdminReply(e.target.value)} />
-                 <button type="submit" className="w-full bg-malawi-green text-white p-4 rounded-2xl font-black uppercase shadow-xl active:scale-95 transition-all">Authorize & Resolve</button>
-               </form>
-            </div>
-          </div>
+    <div className="space-y-6 pb-12 animate-in fade-in duration-500">
+      {/* Supabase Setup Guide */}
+      {!cloudInfo.ok && !isChecking && (
+        <div className="bg-blue-50 border-2 border-blue-100 p-8 rounded-[2.5rem] space-y-6 shadow-xl">
+           <div className="flex items-center gap-4 text-blue-600">
+             <Server size={40} className="shrink-0" />
+             <div>
+               <h2 className="text-xl font-black uppercase tracking-tight">Database Initialization Required</h2>
+               <p className="text-sm font-bold opacity-80">Your Supabase client is connected, but the table is missing.</p>
+             </div>
+           </div>
+           
+           <div className="bg-white p-6 rounded-3xl space-y-4 shadow-inner border border-blue-100">
+             <h3 className="font-black text-xs uppercase text-gray-400">Run this in your Supabase SQL Editor:</h3>
+             <pre className="bg-gray-900 text-green-400 p-4 rounded-xl text-[10px] font-mono overflow-x-auto">
+{`CREATE TABLE IF NOT EXISTS app_state (
+  id TEXT PRIMARY KEY,
+  data JSONB,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Realtime for this table
+ALTER PUBLICATION supabase_realtime ADD TABLE app_state;`}
+             </pre>
+           </div>
+           
+           <button onClick={runHealthCheck} className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
+             <RefreshCw size={16} /> Re-Check Connection
+           </button>
         </div>
       )}
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-2xl bg-malawi-black text-white shadow-lg`}><ShieldCheck size={24} /></div>
+          <div className="p-3 rounded-2xl bg-malawi-black text-white shadow-lg"><ShieldCheck size={24} /></div>
           <div>
-            <h1 className="text-2xl font-black text-malawi-black uppercase tracking-tight">Admin Control Center</h1>
+            <h1 className="text-2xl font-black text-malawi-black uppercase tracking-tight">Admin Center</h1>
             <div className="flex items-center gap-2 mt-1">
               <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                cloudStatus === 'online' ? 'bg-green-50 text-green-600' : cloudStatus === 'error' ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'
+                cloudInfo.ok ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
               }`}>
-                {cloudStatus === 'online' ? <Cloud size={12} /> : cloudStatus === 'error' ? <CloudOff size={12} /> : <Loader2 size={12} className="animate-spin" />}
-                {cloudStatus === 'online' ? 'Sync Active' : cloudStatus === 'error' ? 'Database Error' : 'Checking...'}
+                <Database size={12} />
+                {cloudInfo.ok ? 'Supabase Online' : 'Database Offline'}
               </div>
+              <button onClick={handleManualSync} className="text-[9px] font-black uppercase text-gray-400 hover:text-malawi-black flex items-center gap-1">
+                <RefreshCw size={10} className={isChecking ? 'animate-spin' : ''} /> Force Sync
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      {cloudStatus === 'error' && (
-        <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-start gap-3 text-red-700 animate-in shake">
-           <AlertTriangle className="shrink-0 mt-0.5" size={18} />
-           <div>
-             <p className="text-xs font-black uppercase">Database Table Missing</p>
-             <p className="text-[10px] opacity-80 mt-1">The 'system_data' table could not be found. Please check Step 1 of the instructions.</p>
-           </div>
-        </div>
-      )}
-
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-malawi-black font-black uppercase tracking-widest text-xs"><Filter size={16} className="text-malawi-red" /> System Filters</div>
-          <button onClick={resetFilters} className="text-[10px] font-black uppercase tracking-widest text-gray-400">Clear All</button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} /><input type="text" placeholder="Search..." className="w-full pl-9 pr-4 py-3 bg-gray-50 border rounded-xl text-xs" value={searchText} onChange={(e) => setSearchText(e.target.value)} /></div>
-          <select className="w-full px-4 py-3 bg-gray-50 border rounded-xl text-[10px] font-black uppercase" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="ALL">All Statuses</option>
-            {tab === 'withdrawals' && <><option value={WithdrawalStatus.PENDING}>Pending</option><option value={WithdrawalStatus.APPROVED}>Approved</option></>}
-          </select>
-        </div>
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex gap-4">
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <input 
+              type="text" 
+              placeholder="Filter by name, phone or username..." 
+              className="w-full pl-9 pr-4 py-3 bg-gray-50 border rounded-xl text-xs outline-none focus:ring-1 focus:ring-malawi-green" 
+              value={searchText} 
+              onChange={(e) => setSearchText(e.target.value)} 
+            />
+          </div>
       </div>
 
-      <div className="flex border-b border-gray-200 gap-8 overflow-x-auto pb-px">
-        {['withdrawals', 'memberships', 'complaints', 'users', 'team'].map((id) => (
-          <button key={id} onClick={() => setTab(id as any)} className={`pb-4 font-black uppercase tracking-widest text-xs border-b-2 ${tab === id ? 'border-malawi-red text-malawi-red' : 'border-transparent text-gray-400'}`}>{id}</button>
+      <div className="flex border-b border-gray-200 gap-8 overflow-x-auto pb-px scrollbar-hide">
+        {[
+          { id: 'withdrawals', label: 'Withdrawals', count: state.withdrawals.filter(w => w.status === 'PENDING').length },
+          { id: 'memberships', label: 'Pending Tiers', count: state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING).length },
+          { id: 'complaints', label: 'Support', count: state.complaints.filter(c => c.status === 'PENDING').length },
+          { id: 'users', label: 'All Affiliates', count: state.users.length }
+        ].map((item) => (
+          <button 
+            key={item.id} 
+            onClick={() => setTab(item.id as any)} 
+            className={`pb-4 font-black uppercase tracking-widest text-xs border-b-2 transition-all whitespace-nowrap flex items-center gap-2 ${
+              tab === item.id ? 'border-malawi-red text-malawi-red' : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            {item.label}
+            {item.count > 0 && <span className="bg-malawi-red text-white text-[8px] px-1.5 py-0.5 rounded-full">{item.count}</span>}
+          </button>
         ))}
       </div>
 
@@ -204,17 +193,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         {tab === 'withdrawals' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]"><tr><th className="px-6 py-4">User</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-center">Actions</th></tr></thead>
+              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="px-6 py-4">User</th>
+                  <th className="px-6 py-4">Amount</th>
+                  <th className="px-6 py-4">Gateway</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredWithdrawals.map(w => (
+                {filteredWithdrawals.length === 0 ? (
+                  <tr><td colSpan={5} className="p-12 text-center text-gray-400 italic">No withdrawals found.</td></tr>
+                ) : filteredWithdrawals.map(w => (
                   <tr key={w.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 font-bold">{w.userName}<p className="text-[10px] text-gray-400">{w.phone}</p></td>
+                    <td className="px-6 py-4 font-bold">
+                      {w.userName}
+                      <p className="text-[10px] text-gray-400 font-medium">{w.phone}</p>
+                    </td>
                     <td className="px-6 py-4 font-black text-malawi-red">MWK {w.amount.toLocaleString()}</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 bg-yellow-50 text-yellow-700 text-[10px] font-black rounded-full">{w.status}</span></td>
-                    <td className="px-6 py-4 flex gap-2 justify-center">
-                      {w.status === WithdrawalStatus.PENDING && (
-                        <><button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.APPROVED)} className="bg-malawi-green text-white p-2 rounded-lg"><Check size={16} /></button><button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.REJECTED)} className="bg-malawi-red text-white p-2 rounded-lg"><X size={16} /></button></>
-                      )}
+                    <td className="px-6 py-4 text-[10px] font-black uppercase text-gray-500">{w.paymentMethod}</td>
+                    <td className="px-6 py-4 text-[10px] font-black uppercase">
+                      <span className={w.status === 'PENDING' ? 'text-orange-500' : w.status === 'APPROVED' ? 'text-green-500' : 'text-red-500'}>
+                        {w.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2 justify-center">
+                        {w.proofUrl && (
+                          <button onClick={() => viewProof(w.proofUrl)} className="bg-gray-100 text-gray-600 p-2 rounded-lg hover:bg-gray-200 transition-colors" title="View ID Proof"><Eye size={16} /></button>
+                        )}
+                        {w.status === WithdrawalStatus.PENDING && (
+                          <>
+                            <button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.APPROVED)} className="bg-malawi-green text-white p-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm"><Check size={16} /></button>
+                            <button onClick={() => handleWithdrawalAction(w.id, WithdrawalStatus.REJECTED)} className="bg-malawi-red text-white p-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm"><X size={16} /></button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -222,15 +237,124 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
             </table>
           </div>
         )}
+
         {tab === 'memberships' && (
           <div className="overflow-x-auto">
-             <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="px-6 py-4">Applicant</th>
+                  <th className="px-6 py-4">Tier</th>
+                  <th className="px-6 py-4">Joined</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredMemberships.map(m => (
-                  <tr key={m.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4"><p className="font-bold">{m.fullName}</p><p className="text-[10px] text-gray-400">@{m.username}</p></td>
-                    <td className="px-6 py-4 font-black uppercase">{m.membershipTier}</td>
-                    <td className="px-6 py-4 flex gap-2 justify-center"><button onClick={() => handleMembershipAction(m.id, MembershipStatus.ACTIVE)} className="bg-malawi-green text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Approve</button></td>
+                {pendingMemberships.length === 0 ? (
+                  <tr><td colSpan={4} className="p-12 text-center text-gray-400 italic">No pending activation requests.</td></tr>
+                ) : pendingMemberships.map(u => (
+                  <tr key={u.id} className="hover:bg-gray-50/50">
+                    <td className="px-6 py-4 font-bold">{u.fullName}<p className="text-[10px] text-gray-400 font-medium">@{u.username}</p></td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: MEMBERSHIP_TIERS.find(t => t.tier === u.membershipTier)?.color || '#ccc' }}></div>
+                        <span className="font-black text-[10px] uppercase">{u.membershipTier}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 text-[10px]">{new Date(u.createdAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => viewProof(u.membershipProofUrl)} className="bg-blue-50 text-blue-600 p-2 rounded-lg hover:bg-blue-100 transition-colors" title="View Receipt"><ExternalLink size={16} /></button>
+                        <button onClick={() => handleMembershipAction(u.id, MembershipStatus.ACTIVE)} className="bg-malawi-green text-white p-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm" title="Approve"><Check size={16} /></button>
+                        <button onClick={() => handleMembershipAction(u.id, MembershipStatus.INACTIVE)} className="bg-malawi-red text-white p-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm" title="Reject"><X size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === 'complaints' && (
+          <div className="p-6 space-y-6">
+            {pendingComplaints.length === 0 ? (
+              <div className="p-12 text-center text-gray-400 italic">No unresolved support tickets.</div>
+            ) : pendingComplaints.map(c => (
+              <div key={c.id} className="bg-gray-50 border border-gray-100 rounded-2xl p-6 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-black text-malawi-black uppercase tracking-tight">{c.subject}</h4>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">From: {c.userName} (@{state.users.find(u => u.id === c.userId)?.username})</p>
+                  </div>
+                  <span className="text-[9px] font-black text-gray-300 uppercase">{new Date(c.createdAt).toLocaleString()}</span>
+                </div>
+                <div className="bg-white p-4 rounded-xl text-sm italic border text-gray-600">"{c.message}"</div>
+                <div className="space-y-2">
+                  <textarea 
+                    className="w-full p-4 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-malawi-red resize-none"
+                    placeholder="Type your official response..."
+                    rows={3}
+                    value={replyText[c.id] || ""}
+                    onChange={(e) => setReplyText({ ...replyText, [c.id]: e.target.value })}
+                  />
+                  <button 
+                    onClick={() => handleReplyComplaint(c.id)}
+                    disabled={!replyText[c.id]?.trim()}
+                    className="bg-malawi-black text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gray-800 transition-all disabled:opacity-30"
+                  >
+                    <MessageSquare size={14} /> Send Official Reply
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {tab === 'users' && (
+          <div className="overflow-x-auto">
+             <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="px-6 py-4">User Details</th>
+                  <th className="px-6 py-4">Tier</th>
+                  <th className="px-6 py-4">Wallet</th>
+                  <th className="px-6 py-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {allUsers.map(u => (
+                  <tr key={u.id} className="hover:bg-gray-50/50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 overflow-hidden">
+                            {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover" /> : <UserCheck size={20} />}
+                         </div>
+                         <div>
+                            <p className="font-bold">{u.fullName}</p>
+                            <p className="text-[10px] text-gray-400">@{u.username} • {u.phone}</p>
+                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <span className="text-[10px] font-black uppercase" style={{ color: MEMBERSHIP_TIERS.find(t => t.tier === u.membershipTier)?.color }}>
+                         {u.membershipTier}
+                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="flex flex-col">
+                         <span className="font-black text-malawi-green">MWK {u.balance.toLocaleString()}</span>
+                         <span className="text-[9px] text-gray-400 uppercase font-bold">Earned: {u.totalEarnings.toLocaleString()}</span>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
+                         u.membershipStatus === MembershipStatus.ACTIVE ? 'bg-green-50 text-green-600' : 
+                         u.membershipStatus === MembershipStatus.PENDING ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'
+                       }`}>
+                         {u.membershipStatus}
+                       </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

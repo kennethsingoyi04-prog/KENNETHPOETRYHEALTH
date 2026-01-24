@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
@@ -16,19 +16,17 @@ import Navbar from './components/Navbar';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
 import { syncAppStateToCloud, fetchAppStateFromCloud } from './dataService';
 
-const STORAGE_KEY = 'kph_v6_stable_storage';
+const STORAGE_KEY = 'kph_v7_final_storage';
 
 const App: React.FC = () => {
-  const [isCloudInitialized, setIsCloudInitialized] = useState(false);
-  const isInitialMount = useRef(true);
-
-  // 1. Load from LocalStorage FIRST (Prevents "Sign Up" screen flicker)
+  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  
+  // 1. Initial State from LocalStorage (fastest load)
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Ensure system users always exist
         if (parsed.users && parsed.users.length > 0) return parsed;
       } catch (e) { console.error("Cache corrupted"); }
     }
@@ -59,42 +57,41 @@ const App: React.FC = () => {
     };
   });
 
-  // 2. Fetch Cloud Data and MERGE into local state
+  // 2. Fetch from Supabase and Merge
   useEffect(() => {
-    const loadCloud = async () => {
+    const initCloud = async () => {
       const cloudData = await fetchAppStateFromCloud();
       if (cloudData) {
         setState(prev => {
-          // Merge logic: Local users + Cloud users (don't duplicate)
-          const localUserIds = new Set(prev.users.map(u => u.id));
-          const newUsers = (cloudData.users || []).filter(u => !localUserIds.has(u.id));
-          
+          // Merge logic: Prioritize newer users and referrals from cloud
+          // but keep the current local user session
           return {
             ...prev,
-            ...cloudData,
-            users: [...prev.users, ...newUsers],
-            // DO NOT let cloud overwrite current local session
-            currentUser: prev.currentUser 
+            users: cloudData.users || prev.users,
+            withdrawals: cloudData.withdrawals || prev.withdrawals,
+            referrals: cloudData.referrals || prev.referrals,
+            complaints: cloudData.complaints || prev.complaints,
+            systemSettings: cloudData.systemSettings || prev.systemSettings,
+            currentUser: prev.currentUser // Critical: preserve current session
           };
         });
       }
-      setIsCloudInitialized(true);
+      setIsCloudLoaded(true);
     };
-    loadCloud();
+    initCloud();
   }, []);
 
-  // 3. Persist to LocalStorage and Cloud
+  // 3. Persistent Synchronization
   useEffect(() => {
-    // Always save to device immediately
+    // Save to LocalStorage for offline/instant access
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-
-    // Sync to cloud only if we've initialized and it's not the very first blank mount
-    if (isCloudInitialized && !isInitialMount.current) {
-      const timer = setTimeout(() => syncAppStateToCloud(state), 2000);
+    
+    // Sync to Cloud whenever state changes and cloud is initialized
+    if (isCloudLoaded) {
+      const timer = setTimeout(() => syncAppStateToCloud(state), 1500);
       return () => clearTimeout(timer);
     }
-    isInitialMount.current = false;
-  }, [state, isCloudInitialized]);
+  }, [state, isCloudLoaded]);
 
   const login = (identifier: string, password?: string) => {
     const user = state.users.find(u => 
@@ -126,39 +123,17 @@ const App: React.FC = () => {
         />
         <main className="container mx-auto px-4 py-6">
           <Routes>
-            <Route path="/" element={
-              state.currentUser ? <Navigate to="/dashboard" /> : <Landing />
-            } />
-            <Route path="/auth" element={
-              state.currentUser ? <Navigate to="/dashboard" /> : <Auth state={state} onLogin={login} onStateUpdate={updateUserState} />
-            } />
-            <Route path="/activate" element={
-              state.currentUser ? <Activate state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
-            } />
-            <Route path="/dashboard" element={
-              state.currentUser ? <Dashboard state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
-            } />
-            <Route path="/withdraw" element={
-              state.currentUser ? <Withdraw state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
-            } />
-            <Route path="/history" element={
-              state.currentUser ? <History state={state} /> : <Navigate to="/auth" />
-            } />
-            <Route path="/profile" element={
-              state.currentUser ? <Profile state={state} onStateUpdate={updateUserState} onLogout={logout} /> : <Navigate to="/auth" />
-            } />
-            <Route path="/complaints" element={
-              state.currentUser ? <Complaints state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />
-            } />
-            <Route path="/image-lab" element={
-              state.currentUser ? <ImageLab /> : <Navigate to="/auth" />
-            } />
-            <Route path="/admin" element={
-              state.currentUser?.role === 'ADMIN' ? <AdminDashboard state={state} onStateUpdate={updateUserState} /> : <Navigate to="/dashboard" />
-            } />
-            <Route path="/admin/proof-preview" element={
-              state.currentUser?.role === 'ADMIN' ? <ProofPreview /> : <Navigate to="/auth" />
-            } />
+            <Route path="/" element={state.currentUser ? <Navigate to="/dashboard" /> : <Landing />} />
+            <Route path="/auth" element={state.currentUser ? <Navigate to="/dashboard" /> : <Auth state={state} onLogin={login} onStateUpdate={updateUserState} />} />
+            <Route path="/activate" element={state.currentUser ? <Activate state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />} />
+            <Route path="/dashboard" element={state.currentUser ? <Dashboard state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />} />
+            <Route path="/withdraw" element={state.currentUser ? <Withdraw state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />} />
+            <Route path="/history" element={state.currentUser ? <History state={state} /> : <Navigate to="/auth" />} />
+            <Route path="/profile" element={state.currentUser ? <Profile state={state} onStateUpdate={updateUserState} onLogout={logout} /> : <Navigate to="/auth" />} />
+            <Route path="/complaints" element={state.currentUser ? <Complaints state={state} onStateUpdate={updateUserState} /> : <Navigate to="/auth" />} />
+            <Route path="/image-lab" element={state.currentUser ? <ImageLab /> : <Navigate to="/auth" />} />
+            <Route path="/admin" element={state.currentUser?.role === 'ADMIN' ? <AdminDashboard state={state} onStateUpdate={updateUserState} /> : <Navigate to="/dashboard" />} />
+            <Route path="/admin/proof-preview" element={state.currentUser?.role === 'ADMIN' ? <ProofPreview /> : <Navigate to="/auth" />} />
           </Routes>
         </main>
       </div>

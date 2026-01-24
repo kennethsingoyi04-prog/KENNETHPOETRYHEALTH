@@ -1,65 +1,72 @@
 
-import { supabase } from './supabaseClient';
 import { AppState } from './types';
+import { supabase } from './supabaseClient';
+
+export type CloudStatus = {
+  ok: boolean;
+  error?: string;
+  isCloud: boolean;
+};
 
 /**
- * Robust check to see if the cloud is accessible.
+ * Checks if the Supabase connection is working and the required table exists.
  */
-export const checkCloudHealth = async (): Promise<boolean> => {
+export const checkCloudHealth = async (): Promise<CloudStatus> => {
   try {
-    const { error } = await supabase.from('system_data').select('id').limit(1);
-    return !error;
-  } catch {
-    return false;
+    const { data, error } = await supabase
+      .from('app_state')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      return { ok: false, isCloud: true, error: error.message };
+    }
+    return { ok: true, isCloud: true };
+  } catch (err: any) {
+    return { ok: false, isCloud: true, error: err.message };
   }
 };
 
 /**
- * Syncs the local state to Supabase securely.
- * This function now fails silently if the table doesn't exist.
+ * Syncs the local state to Supabase.
+ * We store the entire state in a single row for simplicity in this architecture,
+ * though in a massive app you'd use individual tables.
  */
 export const syncAppStateToCloud = async (state: AppState) => {
-  // 1. NEVER sync the 'currentUser' to the global state. 
-  // Session is private to the device.
+  if (!state.users || state.users.length === 0) return;
+
   const { currentUser, ...persistentData } = state;
-  
-  // 2. Prevent syncing empty data over existing cloud data
-  if (state.users.length <= 1 && !state.users.some(u => !u.isOwner)) {
-    return;
-  }
 
   try {
     const { error } = await supabase
-      .from('system_data')
+      .from('app_state')
       .upsert({ 
-        id: 'kph_global_state', 
-        payload: persistentData,
+        id: 'main_storage', 
+        data: persistentData,
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
 
-    if (error) {
-      console.warn('Sync failed (Table may be missing or RLS is ON):', error.message);
-    }
+    if (error) throw error;
   } catch (err) {
-    // Background sync failure should not interrupt the user
+    console.warn('Supabase Sync Failed:', err);
   }
 };
 
 /**
- * Fetches cloud data without breaking the local session.
+ * Fetches state from Supabase.
  */
 export const fetchAppStateFromCloud = async (): Promise<Partial<AppState> | null> => {
   try {
     const { data, error } = await supabase
-      .from('system_data')
-      .select('payload')
-      .eq('id', 'kph_global_state')
-      .maybeSingle();
+      .from('app_state')
+      .select('data')
+      .eq('id', 'main_storage')
+      .single();
 
-    if (error) throw error;
-    return data?.payload as Partial<AppState> || null;
-  } catch (err: any) {
-    console.warn("Cloud fetch skipped:", err.message);
+    if (error || !data) return null;
+    return data.data as Partial<AppState>;
+  } catch (err) {
+    console.error('Fetch error:', err);
     return null;
   }
 };
