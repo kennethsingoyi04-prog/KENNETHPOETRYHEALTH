@@ -49,7 +49,8 @@ export interface User {
   balance: number;
   totalEarnings: number;
   createdAt: string;
-  lastLoginAt?: string; // New: Track user activity
+  lastLoginAt?: string; 
+  isBanned?: boolean; // New: Admin moderation
   password?: string;
   profilePic?: string;
   bio?: string;
