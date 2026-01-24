@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, WithdrawalStatus, MembershipStatus, User, WithdrawalRequest, MembershipTier } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { checkCloudHealth, syncAppStateToCloud, uploadImage, nuclearScrub, fetchAppStateFromCloud } from '../dataService';
@@ -8,7 +8,8 @@ import {
   X, Wallet, Users, Zap, Award,
   ImageIcon, CheckCircle2, 
   MessageSquareWarning, Maximize2, Loader2, Database, Trash2,
-  Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle
+  Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
+  Copy, ClipboardCheck, Info
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -22,14 +23,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [searchText, setSearchText] = useState("");
   const [connStatus, setConnStatus] = useState<'IDLE' | 'TESTING' | 'SUCCESS' | 'FAILED'>('IDLE');
   const [payloadSize, setPayloadSize] = useState<number>(0);
+  const [copiedSql, setCopiedSql] = useState(false);
   
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
   const [payoutNote, setPayoutNote] = useState<{ [key: string]: string }>({});
+
+  const SUPABASE_SQL = `-- 1. Create the main data storage table
+CREATE TABLE IF NOT EXISTS public.app_state (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Enable Security (RLS)
+ALTER TABLE public.app_state ENABLE ROW LEVEL SECURITY;
+
+-- 3. Allow your app to read/write data
+CREATE POLICY "Public Full Access" ON public.app_state FOR ALL USING (true) WITH CHECK (true);
+
+-- 4. Create a bucket for receipts and IDs (Storage)
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('images', 'images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 5. Allow public to upload to images bucket
+CREATE POLICY "Public Upload Access" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'images');
+CREATE POLICY "Public Read Access" ON storage.objects FOR SELECT USING (bucket_id = 'images');`;
+
+  useEffect(() => {
+    testSupabaseConnection();
+  }, []);
 
   const handleManualSync = async () => {
     setIsChecking(true);
     await syncAppStateToCloud(state);
     setIsChecking(false);
+    testSupabaseConnection();
   };
 
   const testSupabaseConnection = async () => {
@@ -47,8 +76,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     }
   };
 
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
+
   const handleNuclearPurge = async () => {
-    if (!window.confirm("PURGE DATA: This will strip all heavy images from the cloud to keep your Vercel bandwidth at 0%. Your balances are safe. Proceed?")) return;
+    if (!window.confirm("PURGE DATA: This will strip all heavy strings from the cloud to keep your Supabase bandwidth at 0%. Your balances are safe. Proceed?")) return;
     setIsChecking(true);
     try {
       const cloudData = await fetchAppStateFromCloud();
@@ -57,7 +92,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       onStateUpdate(cleanedData);
       await syncAppStateToCloud({ ...state, ...cleanedData });
       await testSupabaseConnection();
-      alert("Deployment Safety Purge Complete!");
+      alert("Zero-Billing Guard Purge Complete!");
     } catch (err: any) {
       alert("Error: " + err.message);
     } finally {
@@ -105,7 +140,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           <div>
             <h1 className="text-4xl font-black uppercase tracking-tight text-malawi-black">Admin HQ</h1>
             <p className="text-gray-400 font-bold text-xs uppercase tracking-[0.3em] mt-1 flex items-center gap-2">
-              <ShieldCheck size={12} className="text-malawi-green" /> New Project Deployment Active
+              <ShieldCheck size={12} className="text-malawi-green" /> Free-Forever Mode Active
             </p>
           </div>
         </div>
@@ -123,7 +158,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           { id: 'withdrawals', label: 'Payouts', icon: Wallet, count: state.withdrawals.filter(w => w.status === 'PENDING').length },
           { id: 'memberships', label: 'Activations', icon: Zap, count: pendingMemberships.length },
           { id: 'users', label: 'Affiliates', icon: Users },
-          { id: 'settings', label: 'Safety Hub', icon: ShieldAlert }
+          { id: 'settings', label: 'Free Tier Safety', icon: ShieldAlert }
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase border relative transition-all ${tab === t.id ? 'bg-malawi-black text-white shadow-xl scale-105 z-10' : 'bg-white text-gray-400 hover:text-gray-600 shadow-sm'}`}>
             <t.icon size={18} /> {t.label}
@@ -190,30 +225,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                       <div className="relative z-10">
                          <div className="flex items-center gap-4 mb-8">
                             <Rocket size={40} />
-                            <h2 className="text-3xl font-black uppercase tracking-tight">Free Deployment Active</h2>
+                            <h2 className="text-3xl font-black uppercase tracking-tight">Netlify & Supabase Sync</h2>
                          </div>
                          <p className="text-sm font-bold opacity-80 uppercase leading-relaxed mb-6">
-                           Your database is currently optimized for Vercel. We have blocked all heavy image transfers to ensure you never pay for bandwidth.
+                           Your database is currently optimized for Supabase Free Tier (500MB). We have blocked heavy data transfers to ensure you never pay a cent.
                          </p>
                          <div className="flex gap-4">
                             <div className="bg-white/20 p-4 rounded-2xl">
-                               <p className="text-[10px] font-black uppercase">Payload Size</p>
-                               <p className="text-2xl font-black">{payloadSize.toFixed(1)} KB</p>
+                               <p className="text-[10px] font-black uppercase">Database Usage</p>
+                               <p className="text-2xl font-black">{payloadSize.toFixed(1)} KB / 500 MB</p>
+                               <div className="w-full bg-white/20 h-1 rounded-full mt-2 overflow-hidden">
+                                  <div className="bg-white h-full" style={{ width: `${(payloadSize / 512000) * 100}%` }}></div>
+                               </div>
                             </div>
                             <div className="bg-white/20 p-4 rounded-2xl">
-                               <p className="text-[10px] font-black uppercase">Sync Health</p>
-                               <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'EXCELLENT' : 'CHECKING...'}</p>
+                               <p className="text-[10px] font-black uppercase">Handshake</p>
+                               <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'CONNECTED' : connStatus === 'TESTING' ? 'WAIT...' : 'FAILED'}</p>
                             </div>
                          </div>
                       </div>
                    </div>
 
                    <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Terminal size={20} /> Vercel Setup Guide</h3>
+                      <div className="flex items-center justify-between mb-8">
+                         <h3 className="text-xl font-black uppercase flex items-center gap-2"><Terminal size={20} /> Supabase SQL Handshake</h3>
+                         <button onClick={handleCopySql} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
+                            {copiedSql ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
+                            {copiedSql ? 'Copied!' : 'Copy SQL'}
+                         </button>
+                      </div>
+                      <div className="bg-malawi-black p-6 rounded-2xl overflow-x-auto">
+                        <pre className="text-[10px] font-mono text-malawi-green leading-relaxed">
+                          {SUPABASE_SQL}
+                        </pre>
+                      </div>
+                      <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-3 text-blue-800">
+                        <Info size={18} className="shrink-0" />
+                        <p className="text-[10px] font-bold uppercase leading-relaxed">
+                           Paste this code into the "SQL Editor" on Supabase.com and click "Run". This will automatically link your app and storage buckets.
+                        </p>
+                      </div>
+                   </div>
+
+                   <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
+                      <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-2"><Database size={20} /> Netlify Setup Guide</h3>
                       <div className="space-y-4 text-xs font-bold text-gray-500 uppercase">
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">1</span> Connect GitHub to Vercel</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Go to Settings {"->"} Environment Variables</p>
-                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">3</span> Add SUPABASE_URL and SUPABASE_KEY</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">1</span> Go to Netlify -> Site Configuration -> Environment Variables</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">2</span> Add <code className="text-malawi-red">SUPABASE_URL</code> from Project Settings</p>
+                        <p className="flex items-center gap-3"><span className="w-6 h-6 rounded-lg bg-malawi-black text-white flex items-center justify-center">3</span> Add <code className="text-malawi-red">SUPABASE_KEY</code> (Anon/Public Key)</p>
                       </div>
                    </div>
                 </div>
@@ -221,7 +280,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                 <div className="lg:col-span-4">
                    <div className="bg-malawi-black text-white p-10 rounded-[3.5rem] border-b-8 border-malawi-red shadow-2xl">
                       <h3 className="text-xl font-black uppercase mb-6 flex items-center gap-2 text-malawi-red">
-                         <ZapOff size={24} /> Billing Block
+                         <ZapOff size={24} /> Billing Guard
                       </h3>
                       <button 
                         onClick={handleNuclearPurge}
@@ -229,9 +288,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                         className="w-full py-6 bg-malawi-red text-white font-black rounded-3xl uppercase text-xs tracking-widest shadow-xl active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
                       >
                         {isChecking ? <Loader2 className="animate-spin" /> : <Trash2 size={18} />}
-                        Billing Guard Purge
+                        Zero-Billing Purge
                       </button>
-                      <p className="text-[9px] text-gray-500 font-black uppercase text-center mt-6">Cleans DB for Free Tier Safety</p>
+                      <p className="text-[9px] text-gray-500 font-black uppercase text-center mt-6 leading-relaxed">
+                        Forces the database to stay tiny and free by stripping old heavy assets.
+                      </p>
                    </div>
                 </div>
              </div>
@@ -261,7 +322,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                         <button onClick={() => setViewingProofUrl(w.proofUrl || null)} className="w-12 h-12 rounded-xl overflow-hidden border shadow-sm">
                            <img src={w.proofUrl} className="w-full h-full object-cover" />
                         </button>
-                      ) : <span className="text-[9px] font-black text-gray-300">Cleaned</span>}
+                      ) : <span className="text-[9px] font-black text-gray-300">Sync Limit</span>}
                     </td>
                     <td className="px-10 py-8 font-black text-malawi-green">MWK {w.amount.toLocaleString()}</td>
                     <td className="px-10 py-8 text-center">

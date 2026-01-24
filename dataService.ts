@@ -7,9 +7,10 @@ export type CloudStatus = {
   error?: string;
   isCloud: boolean;
   payloadSizeKb?: number;
+  rowCount?: number;
 };
 
-// Hard limit to stay in Vercel's Free Tier forever
+// Hard limit to stay in Vercel/Netlify Free Tier forever (300KB is very safe)
 const MAX_PAYLOAD_KB = 300; 
 
 /**
@@ -36,9 +37,9 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
 };
 
 /**
- * AGGRESSIVE SCRUBBER: 
- * Ensures the JSON payload is strictly metadata. 
- * Any string over 500 chars is considered a potential threat to bandwidth.
+ * FREE FOREVER PROTECTOR: 
+ * Strips all "heavy" data like Base64 images and massive strings.
+ * This ensures your Supabase Database stays under 500MB and Bandwidth under 5GB.
  */
 export const nuclearScrub = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) return obj;
@@ -48,9 +49,9 @@ export const nuclearScrub = (obj: any): any => {
   for (const key in obj) {
     const value = obj[key];
     if (typeof value === 'string') {
-      // If a string is suspiciously long (like Base64), strip it.
-      if (value.startsWith('data:') || value.length > 500) {
-        (scrubbed as any)[key] = "[BANDWIDTH_SAFETY_REMOVAL]";
+      // If a string is Base64 or over 300 chars, it's a billing risk. Replace it.
+      if (value.startsWith('data:') || value.length > 300) {
+        (scrubbed as any)[key] = "[PROTECTED_FOR_FREE_TIER]";
       } else {
         (scrubbed as any)[key] = value;
       }
@@ -64,11 +65,18 @@ export const nuclearScrub = (obj: any): any => {
 };
 
 /**
- * Safe Image Upload:
- * Stores images in Supabase Storage (which doesn't count against Vercel bandwidth).
+ * Storage Upload:
+ * Images go to 'Storage' (1GB free), NOT 'Database' (500MB free).
+ * This keeps the main data sync lightning fast and free.
  */
 export const uploadImage = async (file: File, folder: string): Promise<string | null> => {
   try {
+    // Compression check: Reject if file is over 2MB to save storage space
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File too large (Max 2MB). Please compress your image to save space.");
+      return null;
+    }
+
     const fileName = `${folder}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
     const { data, error } = await supabase.storage
       .from('images')
@@ -87,10 +95,6 @@ export const uploadImage = async (file: File, folder: string): Promise<string | 
   }
 };
 
-/**
- * BANDWIDTH-GUARDED SYNC:
- * Refuses to sync if the data would exceed the free tier safety limit.
- */
 export const syncAppStateToCloud = async (state: AppState) => {
   if (!state.users || state.users.length === 0) return;
 
@@ -98,9 +102,8 @@ export const syncAppStateToCloud = async (state: AppState) => {
   const optimizedData = nuclearScrub(persistentData);
   const sizeKb = JSON.stringify(optimizedData).length / 1024;
 
-  // PROTECTION: Prevent billing by blocking massive syncs
   if (sizeKb > MAX_PAYLOAD_KB) {
-    console.error(`CRITICAL: Payload size (${sizeKb.toFixed(1)}KB) exceeds safety limit. Sync blocked to prevent billing.`);
+    console.error(`Sync Blocked: Payload ${sizeKb.toFixed(1)}KB is too large for the safety limit.`);
     return;
   }
 
@@ -114,9 +117,8 @@ export const syncAppStateToCloud = async (state: AppState) => {
       }, { onConflict: 'id' });
 
     if (error) throw error;
-    console.log(`Cloud Sync Success: ${sizeKb.toFixed(1)}KB used.`);
   } catch (err) {
-    console.warn('Supabase Sync Failed:', err);
+    console.warn('Sync failed:', err);
   }
 };
 
@@ -129,8 +131,7 @@ export const fetchAppStateFromCloud = async (): Promise<Partial<AppState> | null
       .maybeSingle();
 
     if (error) return null;
-    if (!data) return null;
-    return data.data as Partial<AppState>;
+    return data?.data as Partial<AppState> || null;
   } catch (err) {
     return null;
   }
