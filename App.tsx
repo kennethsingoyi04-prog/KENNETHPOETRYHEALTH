@@ -50,7 +50,7 @@ const App: React.FC = () => {
     complaints: []
   });
 
-  // 1. Initial Cloud Sync (Master Source of Truth)
+  // 1. Initial Cloud Sync
   useEffect(() => {
     const initApp = async () => {
       const health = await checkCloudHealth();
@@ -78,7 +78,23 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  // 2. Continuous Sync
+  // 2. Heartbeat: Update "lastLoginAt" every 2 minutes while active
+  useEffect(() => {
+    if (state.currentUser && isOnline) {
+      const heartbeat = setInterval(() => {
+        const now = new Date().toISOString();
+        setState(prev => {
+          if (!prev.currentUser) return prev;
+          const updatedUser = { ...prev.currentUser, lastLoginAt: now };
+          const updatedUsers = prev.users.map(u => u.id === prev.currentUser?.id ? updatedUser : u);
+          return { ...prev, users: updatedUsers, currentUser: updatedUser };
+        });
+      }, 120000); // 2 minutes
+      return () => clearInterval(heartbeat);
+    }
+  }, [state.currentUser?.id, isOnline]);
+
+  // 3. Continuous Cloud Sync
   useEffect(() => {
     if (isReady && isOnline) {
       const timeout = setTimeout(() => {
@@ -96,8 +112,6 @@ const App: React.FC = () => {
     if (user) {
       const now = new Date().toISOString();
       const updatedUser = { ...user, lastLoginAt: now };
-      
-      // Update the user list with the new lastLoginAt
       const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
       
       localStorage.setItem(SESSION_KEY, user.id);
