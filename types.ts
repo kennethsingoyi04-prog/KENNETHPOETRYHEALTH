@@ -69,7 +69,8 @@ export interface WithdrawalRequest {
   phone: string;
   whatsapp: string;
   paymentMethod: PaymentMethod;
-  proofUrl?: string;
+  proofUrl?: string; // User's ID Proof
+  paymentProofUrl?: string; // Admin's Payment Confirmation Screenshot
   status: WithdrawalStatus;
   createdAt: string;
   adminNote?: string;

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AppState, WithdrawalStatus } from '../types';
-import { Download, Clock, CheckCircle2, XCircle, FileText, Info, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Download, Clock, CheckCircle2, XCircle, FileText, Info, Loader2, Image as ImageIcon, Receipt } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { useNavigate } from 'react-router-dom';
@@ -73,42 +73,71 @@ const History: React.FC<HistoryProps> = ({ state }) => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Transaction History</h1>
-        <button onClick={handleDownloadStatement} disabled={isGenerating} className="bg-malawi-black text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
+    <div className="space-y-8 pb-12 animate-in fade-in duration-700">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-malawi-black uppercase tracking-tight">Transaction Ledger</h1>
+          <p className="text-gray-500 font-medium">Detailed history of all your platform activities.</p>
+        </div>
+        <button onClick={handleDownloadStatement} disabled={isGenerating} className="bg-malawi-black hover:bg-gray-800 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-lg transition-all active:scale-95">
           {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-          Statement
+          Export Statement
         </button>
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-bold flex items-center gap-2"><FileText className="text-malawi-red" size={20} /> Withdrawals</h2>
-        <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-          {myWithdrawals.length === 0 ? <div className="p-12 text-center text-gray-400">No withdrawals yet.</div> : (
+        <h2 className="text-xl font-black text-malawi-black uppercase flex items-center gap-2">
+          <FileText className="text-malawi-red" size={24} /> 
+          Withdrawal Requests
+        </h2>
+        <div className="bg-white rounded-[2.5rem] shadow-sm border overflow-hidden">
+          {myWithdrawals.length === 0 ? (
+            <div className="p-20 text-center text-gray-400 space-y-4">
+               <Receipt size={48} className="mx-auto opacity-20" />
+               <p className="italic font-medium">No withdrawals found in your history.</p>
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 border-b text-[10px] font-black uppercase text-gray-400">
                   <tr>
-                    <th className="px-6 py-4 font-bold">Date</th>
-                    <th className="px-6 py-4 font-bold">Amount</th>
-                    <th className="px-6 py-4 font-bold">Identity</th>
-                    <th className="px-6 py-4 font-bold">Status</th>
+                    <th className="px-8 py-6">Date & ID</th>
+                    <th className="px-8 py-6">Amount Request</th>
+                    <th className="px-8 py-6">Admin Receipt</th>
+                    <th className="px-8 py-6">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {myWithdrawals.map((w) => (
-                    <tr key={w.id} className="hover:bg-gray-50/50">
-                      <td className="px-6 py-4 whitespace-nowrap">{new Date(w.createdAt).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 font-bold">MWK {w.amount.toLocaleString()}</td>
-                      <td className="px-6 py-4">
-                        {w.proofUrl ? (
-                          <button onClick={() => viewImage(w.proofUrl)} className="text-blue-600 font-black text-[10px] uppercase flex items-center gap-1 hover:underline">
-                            <ImageIcon size={14} /> My ID Proof
-                          </button>
-                        ) : <span className="text-gray-300 italic text-[10px]">No Proof</span>}
+                    <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-8 py-6 whitespace-nowrap">
+                         <p className="font-bold text-gray-900">{new Date(w.createdAt).toLocaleDateString()}</p>
+                         <p className="text-[10px] text-gray-400 uppercase font-black">{w.id}</p>
                       </td>
-                      <td className="px-6 py-4">{getStatusBadge(w.status)}</td>
+                      <td className="px-8 py-6">
+                         <p className="text-lg font-black text-malawi-green">MWK {w.amount.toLocaleString()}</p>
+                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{w.paymentMethod}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        {w.status === WithdrawalStatus.APPROVED && w.paymentProofUrl ? (
+                          <button 
+                            onClick={() => viewImage(w.paymentProofUrl)} 
+                            className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all shadow-md active:scale-95"
+                          >
+                            <ImageIcon size={14} /> View Receipt
+                          </button>
+                        ) : w.status === WithdrawalStatus.APPROVED ? (
+                          <span className="text-[9px] font-black text-gray-400 uppercase italic">Contact Support</span>
+                        ) : (
+                          <span className="text-[9px] font-black text-gray-300 uppercase italic">---</span>
+                        )}
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className="flex flex-col gap-1">
+                            {getStatusBadge(w.status)}
+                            {w.adminNote && <p className="text-[9px] text-gray-400 font-bold uppercase truncate max-w-[150px]">Note: {w.adminNote}</p>}
+                         </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
