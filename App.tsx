@@ -78,7 +78,7 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  // 2. Heartbeat: Update "lastLoginAt" every 2 minutes while active
+  // 2. Enhanced Heartbeat: Update "lastLoginAt" every 60 seconds while active
   useEffect(() => {
     if (state.currentUser && isOnline) {
       const heartbeat = setInterval(() => {
@@ -89,7 +89,7 @@ const App: React.FC = () => {
           const updatedUsers = prev.users.map(u => u.id === prev.currentUser?.id ? updatedUser : u);
           return { ...prev, users: updatedUsers, currentUser: updatedUser };
         });
-      }, 120000); // 2 minutes
+      }, 60000); // 1 minute heartbeat
       return () => clearInterval(heartbeat);
     }
   }, [state.currentUser?.id, isOnline]);
