@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
@@ -13,93 +13,89 @@ import Complaints from './pages/Complaints';
 import Activate from './pages/Activate';
 import ImageLab from './pages/ImageLab';
 import Navbar from './components/Navbar';
+import Logo from './components/Logo';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
 import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth } from './dataService';
+import { Loader2, Cloud } from 'lucide-react';
 
-const STORAGE_KEY = 'kph_v7_final_storage';
+const SESSION_KEY = 'kph_session_uid';
 
 const App: React.FC = () => {
-  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   
-  const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.users && parsed.users.length > 0) return parsed;
-      } catch (e) { console.error("Cache corrupted"); }
-    }
-    
-    return {
-      currentUser: null,
-      systemSettings: { masterKey: 'KPH-OWNER-2025', maintenanceMode: false },
-      users: [{
-        id: 'owner-1',
-        username: 'owner',
-        fullName: 'Main Owner',
-        email: 'owner@kennethpoetryhealth.mw',
-        phone: '+265888000000',
-        whatsapp: '+265888000000',
-        referralCode: 'OWNER001',
-        role: 'ADMIN',
-        isOwner: true,
-        balance: 0,
-        totalEarnings: 0,
-        createdAt: new Date().toISOString(),
-        password: 'ownerpassword',
-        membershipTier: MembershipTier.GOLD,
-        membershipStatus: MembershipStatus.ACTIVE
-      }],
-      withdrawals: [],
-      referrals: [],
-      complaints: []
-    };
+  const [state, setState] = useState<AppState>({
+    currentUser: null,
+    systemSettings: { masterKey: 'KPH-OWNER-2025', maintenanceMode: false },
+    users: [{
+      id: 'owner-1',
+      username: 'owner',
+      fullName: 'Main Owner',
+      email: 'owner@kennethpoetryhealth.mw',
+      phone: '+265888000000',
+      whatsapp: '+265888000000',
+      referralCode: 'OWNER001',
+      role: 'ADMIN',
+      isOwner: true,
+      balance: 0,
+      totalEarnings: 0,
+      createdAt: new Date().toISOString(),
+      password: 'ownerpassword',
+      membershipTier: MembershipTier.GOLD,
+      membershipStatus: MembershipStatus.ACTIVE
+    }],
+    withdrawals: [],
+    referrals: [],
+    complaints: []
   });
 
-  // Initialize Cloud
+  // 1. Initial Cloud Sync (Master Source of Truth)
   useEffect(() => {
-    const initCloud = async () => {
-      // 1. Check if Supabase is reachable
+    const initApp = async () => {
       const health = await checkCloudHealth();
       setIsOnline(health.ok);
 
       if (health.ok) {
         const cloudData = await fetchAppStateFromCloud();
+        const savedUid = localStorage.getItem(SESSION_KEY);
+        
         if (cloudData) {
+          // Cloud found: Use cloud users and try to restore session
+          const cloudUsers = cloudData.users || [];
+          const sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
+          
           setState(prev => ({
             ...prev,
             ...cloudData,
-            currentUser: prev.currentUser // Preserve session
+            currentUser: sessionUser || null
           }));
         } else {
-          // SEEDING: If cloud is empty, push the local owner account up immediately
+          // Cloud empty: Seed the database with the initial owner state
           await syncAppStateToCloud(state);
         }
       }
-      setIsCloudLoaded(true);
+      setIsReady(true);
     };
-    initCloud();
+    initApp();
   }, []);
 
-  // Periodic Auto-Sync
+  // 2. Continuous Sync (Debounced to avoid rate limiting)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    
-    if (isCloudLoaded && isOnline) {
-      const timer = setTimeout(() => {
+    if (isReady && isOnline) {
+      const timeout = setTimeout(() => {
         syncAppStateToCloud(state);
-      }, 2000);
-      return () => clearTimeout(timer);
+      }, 1500);
+      return () => clearTimeout(timeout);
     }
-  }, [state, isCloudLoaded, isOnline]);
+  }, [state, isReady, isOnline]);
 
   const login = (identifier: string, password?: string) => {
     const user = state.users.find(u => 
-      (u.email === identifier || u.username === identifier) && 
+      (u.email.toLowerCase() === identifier.toLowerCase() || u.username.toLowerCase() === identifier.toLowerCase()) && 
       (!u.password || u.password === password)
     );
     if (user) {
+      localStorage.setItem(SESSION_KEY, user.id);
       setState(prev => ({ ...prev, currentUser: user }));
       return true;
     }
@@ -107,12 +103,38 @@ const App: React.FC = () => {
   };
 
   const logout = () => {
+    localStorage.removeItem(SESSION_KEY);
     setState(prev => ({ ...prev, currentUser: null }));
   };
 
-  const updateUserState = (updatedState: Partial<AppState>) => {
-    setState(prev => ({ ...prev, ...updatedState }));
-  };
+  const updateUserState = useCallback((updatedState: Partial<AppState>) => {
+    setState(prev => {
+      const newState = { ...prev, ...updatedState };
+      // If we are updating users, make sure the current session object is also updated
+      if (updatedState.users && prev.currentUser) {
+        const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
+        if (refreshedUser) newState.currentUser = refreshedUser;
+      }
+      return newState;
+    });
+  }, []);
+
+  // 3. Loading Screen
+  if (!isReady) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-malawi-black text-white space-y-6">
+        <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="animate-spin text-malawi-green" size={32} />
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Establishing Secure Connection...</p>
+        </div>
+        <div className="absolute bottom-10 flex items-center gap-2 text-gray-600">
+           <Cloud size={14} />
+           <span className="text-[9px] font-bold uppercase">KENNETHPOETRYHEALTH Cloud Sync v1.0</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
