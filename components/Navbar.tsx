@@ -15,30 +15,51 @@ import {
   ChevronRight,
   ImageIcon,
   Cloud,
-  CloudOff
+  CloudOff,
+  RefreshCw,
+  Save
 } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User | null;
   onLogout: () => void;
   isOnline?: boolean;
+  isSyncing?: boolean;
+  hasUnsavedChanges?: boolean;
+  onSync?: () => void;
   complaintsCount?: number;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, isOnline = false, complaintsCount = 0 }) => {
+const Navbar: React.FC<NavbarProps> = ({ 
+  currentUser, 
+  onLogout, 
+  isOnline = false, 
+  isSyncing = false, 
+  hasUnsavedChanges = false,
+  onSync,
+  complaintsCount = 0 
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isInactive = currentUser?.membershipStatus === MembershipStatus.INACTIVE;
 
-  const CloudIndicator = () => (
-    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-      isOnline ? 'bg-green-500/10 border-green-500/20 text-green-600' : 'bg-red-500/10 border-red-500/20 text-red-600'
-    }`}>
-      {isOnline ? <Cloud size={12} className="animate-pulse" /> : <CloudOff size={12} />}
-      <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">
-        {isOnline ? 'Sync Active' : 'Offline'}
+  const SyncIndicator = () => (
+    <button 
+      onClick={onSync}
+      disabled={isSyncing || !isOnline}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+        !isOnline ? 'bg-red-500/10 border-red-500/20 text-red-600 grayscale' :
+        hasUnsavedChanges ? 'bg-malawi-red text-white border-malawi-red shadow-lg animate-pulse' : 
+        'bg-green-500/10 border-green-500/20 text-green-600'
+      }`}
+      title={hasUnsavedChanges ? "Changes Pending - Click to Save" : "Data Synced"}
+    >
+      {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : 
+       hasUnsavedChanges ? <Save size={14} /> : <Cloud size={14} />}
+      <span className="text-[9px] font-black uppercase tracking-widest hidden lg:inline">
+        {isSyncing ? 'Saving...' : hasUnsavedChanges ? 'Save to Cloud' : 'Cloud Sync OK'}
       </span>
-    </div>
+    </button>
   );
 
   if (!currentUser) return (
@@ -48,7 +69,6 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, isOnline = false
           <Link to="/">
             <Logo variant="dark" />
           </Link>
-          <CloudIndicator />
         </div>
         <div className="flex items-center gap-4">
            <button 
@@ -124,7 +144,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, isOnline = false
           </div>
 
           <div className="flex items-center gap-4">
-            <CloudIndicator />
+            <SyncIndicator />
             <div className="text-right">
               <p className="text-[10px] text-gray-400 uppercase font-black">Balance</p>
               <p className="text-sm font-bold text-malawi-green">MWK {currentUser.balance.toLocaleString()}</p>
@@ -148,16 +168,17 @@ const Navbar: React.FC<NavbarProps> = ({ currentUser, onLogout, isOnline = false
         </div>
       </nav>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-malawi-black border-t border-gray-800 flex justify-around p-2 z-50 pb-safe">
-        <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={isInactive ? Zap : LayoutDashboard} label={isInactive ? "Activate" : "Home"} />
-        <NavItem to="/image-lab" icon={ImageIcon} label="AI Lab" disabled={isInactive} />
+      {/* Mobile Footer with Sync Button */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-malawi-black border-t border-gray-800 flex justify-around items-center p-2 z-50 pb-safe">
+        <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={isInactive ? Zap : LayoutDashboard} label={isInactive ? "Home" : "Dashboard"} />
         <NavItem to="/withdraw" icon={Wallet} label="Wallet" disabled={isInactive} />
-        <NavItem 
-          to={currentUser.role === 'ADMIN' ? "/admin" : "/profile?tab=support"} 
-          icon={MessageSquareWarning} 
-          label="Support" 
-          badge={currentUser.role === 'ADMIN' ? complaintsCount : 0} 
-        />
+        
+        {/* Central Sync Action for Mobile */}
+        <button onClick={onSync} disabled={isSyncing || !isOnline} className={`p-3 rounded-full shadow-lg -mt-8 border-4 border-malawi-black ${hasUnsavedChanges ? 'bg-malawi-red text-white' : 'bg-malawi-green text-white'}`}>
+           {isSyncing ? <RefreshCw className="animate-spin" size={20} /> : <Cloud size={20} />}
+        </button>
+
+        <NavItem to="/history" icon={HistoryIcon} label="History" disabled={isInactive} />
         <Link to="/profile?tab=account" className={`flex flex-col items-center gap-1 p-2 rounded-lg ${location.pathname === '/profile' ? 'text-malawi-green' : 'text-gray-400'}`}>
           <div className="w-6 h-6 rounded-full overflow-hidden border border-current flex items-center justify-center">
             {currentUser.profilePic ? (

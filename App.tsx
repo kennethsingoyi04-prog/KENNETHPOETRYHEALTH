@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
@@ -16,13 +16,16 @@ import Navbar from './components/Navbar';
 import Logo from './components/Logo';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
 import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth } from './dataService';
-import { Loader2, Cloud } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 const SESSION_KEY = 'kph_session_uid';
 
 const App: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const lastSyncRef = useRef<string>("");
   
   const [state, setState] = useState<AppState>({
     currentUser: null,
@@ -50,7 +53,7 @@ const App: React.FC = () => {
     complaints: []
   });
 
-  // 1. Initial Cloud Sync
+  // 1. Initialize App and fetch Cloud Data
   useEffect(() => {
     const initApp = async () => {
       const health = await checkCloudHealth();
@@ -69,8 +72,7 @@ const App: React.FC = () => {
             ...cloudData,
             currentUser: sessionUser || null
           }));
-        } else {
-          await syncAppStateToCloud(state);
+          lastSyncRef.current = JSON.stringify(cloudData);
         }
       }
       setIsReady(true);
@@ -78,31 +80,36 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  // 2. Enhanced Heartbeat: Update "lastLoginAt" every 60 seconds while active
-  useEffect(() => {
-    if (state.currentUser && isOnline) {
-      const heartbeat = setInterval(() => {
-        const now = new Date().toISOString();
-        setState(prev => {
-          if (!prev.currentUser) return prev;
-          const updatedUser = { ...prev.currentUser, lastLoginAt: now };
-          const updatedUsers = prev.users.map(u => u.id === prev.currentUser?.id ? updatedUser : u);
-          return { ...prev, users: updatedUsers, currentUser: updatedUser };
-        });
-      }, 60000); // 1 minute heartbeat
-      return () => clearInterval(heartbeat);
+  /**
+   * Manual Cloud Sync Logic
+   * This is the "Netlify Saver": It only runs when called.
+   */
+  const triggerManualSync = async () => {
+    if (!isOnline || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await syncAppStateToCloud(state);
+      setHasUnsavedChanges(false);
+      lastSyncRef.current = JSON.stringify(state);
+    } catch (e) {
+      console.error("Sync Failed", e);
+    } finally {
+      setIsSyncing(false);
     }
-  }, [state.currentUser?.id, isOnline]);
+  };
 
-  // 3. Continuous Cloud Sync
-  useEffect(() => {
-    if (isReady && isOnline) {
-      const timeout = setTimeout(() => {
-        syncAppStateToCloud(state);
-      }, 1500);
-      return () => clearTimeout(timeout);
-    }
-  }, [state, isReady, isOnline]);
+  const updateUserState = useCallback((updatedState: Partial<AppState>) => {
+    setState(prev => {
+      const newState = { ...prev, ...updatedState };
+      if (updatedState.users && prev.currentUser) {
+        const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
+        if (refreshedUser) newState.currentUser = refreshedUser;
+      }
+      // Flag that local data is now different from cloud data
+      setHasUnsavedChanges(true);
+      return newState;
+    });
+  }, []);
 
   const login = (identifier: string, password?: string) => {
     const user = state.users.find(u => 
@@ -115,11 +122,7 @@ const App: React.FC = () => {
       const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
       
       localStorage.setItem(SESSION_KEY, user.id);
-      setState(prev => ({ 
-        ...prev, 
-        users: updatedUsers,
-        currentUser: updatedUser 
-      }));
+      updateUserState({ users: updatedUsers, currentUser: updatedUser });
       return true;
     }
     return false;
@@ -130,17 +133,6 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, currentUser: null }));
   };
 
-  const updateUserState = useCallback((updatedState: Partial<AppState>) => {
-    setState(prev => {
-      const newState = { ...prev, ...updatedState };
-      if (updatedState.users && prev.currentUser) {
-        const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
-        if (refreshedUser) newState.currentUser = refreshedUser;
-      }
-      return newState;
-    });
-  }, []);
-
   if (!isReady) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-malawi-black text-white space-y-6">
@@ -148,10 +140,6 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Establishing Secure Connection...</p>
-        </div>
-        <div className="absolute bottom-10 flex items-center gap-2 text-gray-600">
-           <Cloud size={14} />
-           <span className="text-[9px] font-bold uppercase">KENNETHPOETRYHEALTH Cloud Sync v1.0</span>
         </div>
       </div>
     );
@@ -164,8 +152,12 @@ const App: React.FC = () => {
           currentUser={state.currentUser} 
           onLogout={logout} 
           isOnline={isOnline}
+          isSyncing={isSyncing}
+          hasUnsavedChanges={hasUnsavedChanges}
+          onSync={triggerManualSync}
           complaintsCount={state.complaints.filter(c => c.status === 'PENDING').length} 
         />
+        
         <main className="container mx-auto px-4 py-6">
           <Routes>
             <Route path="/" element={state.currentUser ? <Navigate to="/dashboard" /> : <Landing />} />
