@@ -26,6 +26,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [payoutNote, setPayoutNote] = useState("");
   const [isSubmittingPayout, setIsSubmittingPayout] = useState(false);
 
+  // Complaint reply state
+  const [replyingTo, setReplyingTo] = useState<Complaint | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState("");
+
+  // Membership rejection state
+  const [rejectingActivation, setRejectingActivation] = useState<User | null>(null);
+  const [rejectionNote, setRejectionNote] = useState("");
+
   const [banReason, setBanReason] = useState("");
   const [banType, setBanType] = useState<'PERMANENT' | 'TEMPORARY'>('TEMPORARY');
   const [banDuration, setBanDuration] = useState("7"); 
@@ -75,6 +83,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     setProcessingPayout(null);
     setPayoutProofUrl(null);
     setPayoutNote("");
+    alert(`Payout ${status}. User notified.`);
   };
 
   const approveMembership = (targetId: string) => {
@@ -86,7 +95,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     let updatedUsers = [...state.users];
     let updatedReferrals = [...state.referrals];
     
-    updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE } : u);
+    updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE, membershipNote: "Membership activated successfully." } : u);
     
     if (targetUser.referredBy) {
       const l1Referrer = updatedUsers.find(u => u.id === targetUser.referredBy);
@@ -134,10 +143,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     alert("User Activated & Commission Distributed.");
   };
 
+  const rejectMembership = () => {
+    if (!rejectingActivation) return;
+    const updatedUsers = state.users.map(u => u.id === rejectingActivation.id ? { 
+      ...u, 
+      membershipStatus: MembershipStatus.INACTIVE, 
+      membershipNote: rejectionNote || "Activation proof was invalid or rejected." 
+    } : u);
+    onStateUpdate({ users: updatedUsers });
+    setRejectingActivation(null);
+    setRejectionNote("");
+    alert("Membership Activation Rejected. User has been notified.");
+  };
+
   const handleBookSellerAction = (userId: string, status: BookSellerStatus) => {
     const updatedUsers = state.users.map(u => u.id === userId ? { ...u, bookSellerStatus: status } : u);
     onStateUpdate({ users: updatedUsers });
-    alert(`Book Distributor Request ${status === BookSellerStatus.APPROVED ? 'Approved' : 'Rejected'}.`);
+    alert(`Book Distributor Request ${status === BookSellerStatus.APPROVED ? 'Approved' : 'Rejected'}. User notified.`);
   };
 
   const handleUpdateRole = (role: 'USER' | 'ADMIN') => {
@@ -164,6 +186,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     setInspectingUser({ ...inspectingUser, isBanned: false });
   };
 
+  const handleComplaintReply = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyingTo || !adminReplyText.trim()) return;
+    const updatedComplaints = state.complaints.map(c => c.id === replyingTo.id ? { 
+      ...c, 
+      reply: adminReplyText, 
+      status: 'RESOLVED' as const,
+      updatedAt: new Date().toISOString()
+    } : c);
+    onStateUpdate({ complaints: updatedComplaints });
+    setReplyingTo(null);
+    setAdminReplyText("");
+    alert("Response sent to member.");
+  };
+
   const pendingWithdrawals = useMemo(() => state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [state.withdrawals]);
   const pendingActivations = useMemo(() => state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING), [state.users]);
   const pendingBookSellers = useMemo(() => state.users.filter(u => u.bookSellerStatus === BookSellerStatus.PENDING), [state.users]);
@@ -187,6 +224,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         <div className="fixed inset-0 z-[300] bg-black/90 flex items-center justify-center p-8" onClick={() => setViewingProofUrl(null)}>
            <img src={viewingProofUrl} className="max-w-full max-h-full rounded-2xl shadow-2xl" />
            <button className="absolute top-10 right-10 text-white p-4 bg-malawi-red rounded-full"><X size={32}/></button>
+        </div>
+      )}
+
+      {/* Complaint Reply Modal */}
+      {replyingTo && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
+           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
+              <div className="bg-malawi-black p-8 text-white flex justify-between items-center">
+                 <h2 className="text-xl font-black uppercase tracking-tight">Reply to Support Ticket</h2>
+                 <button onClick={() => setReplyingTo(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
+              </div>
+              <form onSubmit={handleComplaintReply} className="p-8 space-y-6">
+                 <div className="bg-gray-50 p-6 rounded-2xl border italic text-xs text-gray-600">
+                    "{replyingTo.message}"
+                 </div>
+                 <textarea required rows={4} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium" placeholder="Type your official response..." value={adminReplyText} onChange={e => setAdminReplyText(e.target.value)} />
+                 <button type="submit" className="w-full py-4 bg-malawi-green text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Send Response</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* Activation Reject Modal */}
+      {rejectingActivation && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
+           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
+              <div className="bg-malawi-red p-8 text-white flex justify-between items-center">
+                 <h2 className="text-xl font-black uppercase tracking-tight">Reject Activation</h2>
+                 <button onClick={() => setRejectingActivation(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
+              </div>
+              <div className="p-8 space-y-6">
+                 <p className="text-xs font-bold text-gray-500 uppercase">Provide reason for rejection (this will be shown to the user):</p>
+                 <textarea required rows={3} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium" placeholder="e.g. Transaction ID not found on receipt..." value={rejectionNote} onChange={e => setRejectionNote(e.target.value)} />
+                 <button onClick={rejectMembership} className="w-full py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Confirm Rejection</button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -288,12 +361,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                           )}
                        </div>
                     </div>
-                    {inspectingUser.isBanned && !inspectingUser.banReason && (
-                       <div className="space-y-4 pt-4 border-t">
-                          <textarea className="w-full p-4 bg-gray-50 border rounded-2xl text-sm" placeholder="Reason for ban..." value={banReason} onChange={e => setBanReason(e.target.value)}/>
-                          <button onClick={handleBanUser} className="w-full py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs">Confirm Ban</button>
-                       </div>
-                    )}
                  </div>
               </div>
            </div>
@@ -320,9 +387,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         {[
           { id: 'withdrawals', label: 'Payouts', icon: Wallet, count: pendingWithdrawals.length },
           { id: 'activations', label: 'Activations', icon: ShieldAlert, count: pendingActivations.length },
-          { id: 'books', label: 'Book Distributors', icon: BookOpen, count: pendingBookSellers.length },
-          { id: 'users', label: 'All Affiliates', icon: Users },
-          { id: 'complaints', label: 'Support', icon: MessageSquare, count: state.complaints.filter(c => c.status === 'PENDING').length },
+          { id: 'books', label: 'Distributors', icon: BookOpen, count: pendingBookSellers.length },
+          { id: 'users', label: 'Affiliates', icon: Users },
+          { id: 'complaints', label: 'Complaints', icon: MessageSquare, count: state.complaints.filter(c => c.status === 'PENDING').length },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase border transition-all relative ${tab === t.id ? 'bg-malawi-black text-white shadow-xl' : 'bg-white text-gray-400 shadow-sm'}`}>
             <t.icon size={18} /> {t.label}
@@ -405,14 +472,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="divide-y">
               {pendingActivations.length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No pending activations</div> : 
                  pendingActivations.map(u => (
-                    <div key={u.id} className="p-10 flex items-center justify-between hover:bg-gray-50">
+                    <div key={u.id} className="p-10 flex items-center justify-between hover:bg-gray-50 transition-colors">
                        <div className="flex items-center gap-6">
                           <div className="w-16 h-16 bg-malawi-green text-white rounded-2xl flex items-center justify-center font-black text-xl">{u.fullName.charAt(0)}</div>
                           <div><h4 className="font-black text-lg uppercase tracking-tight">{u.fullName}</h4><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Applying: {u.membershipTier}</p></div>
                        </div>
                        <div className="flex items-center gap-4">
                           {u.membershipProofUrl && <button onClick={() => setViewingProofUrl(u.membershipProofUrl!)} className="p-4 bg-gray-100 rounded-xl text-gray-400 hover:text-malawi-black transition-colors"><ImageIcon size={20}/></button>}
-                          <button onClick={() => approveMembership(u.id)} className="px-8 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 transition-all active:scale-95"><CheckCircle2 size={16}/> Approve Membership</button>
+                          <div className="flex gap-2">
+                             <button onClick={() => approveMembership(u.id)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 transition-all active:scale-95"><CheckCircle2 size={16}/> Approve</button>
+                             <button onClick={() => setRejectingActivation(u)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 transition-all active:scale-95"><X size={16}/> Reject</button>
+                          </div>
                        </div>
                     </div>
                  ))
@@ -424,7 +494,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="divide-y">
               {pendingBookSellers.length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No distributor requests</div> : 
                  pendingBookSellers.map(u => (
-                    <div key={u.id} className="p-10 flex flex-col hover:bg-gray-50">
+                    <div key={u.id} className="p-10 flex flex-col hover:bg-gray-50 transition-colors">
                        <div className="flex items-center justify-between w-full mb-6">
                           <div className="flex items-center gap-6">
                             <div className="w-16 h-16 bg-malawi-red text-white rounded-2xl flex items-center justify-center font-black text-xl">{u.fullName.charAt(0)}</div>
@@ -438,6 +508,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                        <div className="bg-gray-50 p-6 rounded-3xl grid grid-cols-2 gap-4 border border-gray-100 ml-20 mr-10">
                           <div className="flex items-center gap-3"><Smartphone className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Contact</p><p className="text-xs font-bold">{u.bookSellerWhatsapp || u.whatsapp}</p></div></div>
                           <div className="flex items-center gap-3"><MapPin className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Mailing Address</p><p className="text-xs font-bold">{u.bookSellerAddress}</p></div></div>
+                       </div>
+                    </div>
+                 ))
+              }
+           </div>
+        )}
+
+        {tab === 'complaints' && (
+           <div className="divide-y">
+              {state.complaints.filter(c => c.status === 'PENDING').length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No open complaints</div> : 
+                 state.complaints.filter(c => c.status === 'PENDING').map(c => (
+                    <div key={c.id} className="p-10 flex flex-col hover:bg-gray-50 transition-colors">
+                       <div className="flex items-center justify-between w-full mb-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-malawi-black rounded-xl flex items-center justify-center text-white font-black text-sm">{c.userName.charAt(0)}</div>
+                            <div>
+                               <h4 className="font-black text-sm uppercase">{c.subject}</h4>
+                               <p className="text-[9px] font-bold text-gray-400 uppercase">From: {c.userName} • {new Date(c.createdAt).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => setReplyingTo(c)} className="px-6 py-3 bg-malawi-black text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95 flex items-center gap-2"><MessageCircle size={14}/> Respond</button>
+                       </div>
+                       <div className="ml-16 bg-gray-50 p-5 rounded-2xl border text-sm italic text-gray-600">
+                          "{c.message}"
                        </div>
                     </div>
                  ))

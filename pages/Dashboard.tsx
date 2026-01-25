@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppState, MembershipStatus, BookSellerStatus, User } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
+// Added AlertCircle to imports
 import { 
   Users, 
   Copy, 
@@ -21,7 +23,8 @@ import {
   ChevronDown,
   User as UserIcon,
   Search,
-  Network
+  Network,
+  AlertCircle
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -79,7 +82,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
     }
   };
 
-  const showBookSellingCTA = !user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE;
+  const showBookSellingCTA = !user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE || user.bookSellerStatus === BookSellerStatus.REJECTED;
 
   // Build Hierarchy Data
   const networkTree = useMemo(() => {
@@ -90,7 +93,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
     }));
   }, [state.users, user.id]);
 
-  // Added key to props type to satisfy TS when component is used in .map()
   const NetworkNode = ({ targetUser, level, isRoot = false }: { targetUser: User, level: number, isRoot?: boolean, key?: React.Key }) => (
     <div className="flex flex-col items-center group">
       <div className={`relative flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-300 ${
@@ -151,17 +153,25 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                 <BookOpen size={40} />
               </div>
               <div>
-                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Start Selling Books</h3>
-                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your shop details to start distributing books and earn revenue.</p>
+                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Book Distributor Program</h3>
+                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your details to start advertising our books and earn commission.</p>
               </div>
             </div>
             <button 
               onClick={() => navigate('/profile?tab=bookselling')}
               className="w-full md:w-auto px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-red-800"
             >
-              Apply Now <ArrowRight size={18} />
+              Get Started <ArrowRight size={18} />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Status Notifications */}
+      {user.membershipNote && user.membershipStatus === MembershipStatus.INACTIVE && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl flex items-center gap-3">
+          <AlertCircle className="text-yellow-400" />
+          <p className="text-xs font-bold text-yellow-700 uppercase">Membership Note: {user.membershipNote}</p>
         </div>
       )}
 

@@ -70,6 +70,7 @@ export interface User {
   membershipTier: MembershipTier;
   membershipStatus: MembershipStatus;
   membershipProofUrl?: string;
+  membershipNote?: string;
   // Book Selling Fields
   bookSellerStatus?: BookSellerStatus;
   bookSellerFullName?: string;
