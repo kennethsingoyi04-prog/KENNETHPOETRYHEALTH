@@ -300,8 +300,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         <div className="space-y-6">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-malawi-black">Recent Activity</h3>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">History</p>
+              <h3 className="font-bold text-lg text-malawi-black">Referral Network</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Members</p>
             </div>
             <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
               {myReferrals.length === 0 ? (
@@ -309,20 +309,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                   <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Users size={32} />
                   </div>
-                  <p className="text-sm italic">No referrals yet. Share your link!</p>
+                  <p className="text-sm italic font-bold">No referrals yet. Share your link!</p>
                 </div>
               ) : (
                 myReferrals.map((ref) => {
                   const referredUser = state.users.find(u => u.id === ref.referredId);
                   return (
-                    <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
+                    <div key={ref.id} className="p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-malawi-green/10 text-malawi-green rounded-full flex items-center justify-center font-bold overflow-hidden border border-malawi-green/20">
                           {referredUser?.profilePic ? <img src={referredUser.profilePic} alt="" className="w-full h-full object-cover" /> : <UserIcon size={18} className="text-malawi-green/40" />}
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900 group-hover:text-malawi-green transition-colors text-sm">{referredUser?.fullName}</p>
-                          <p className="text-[10px] text-gray-400 uppercase font-black">L{ref.level} • {new Date(ref.timestamp).toLocaleDateString()}</p>
+                          {/* Display FULL LEGAL NAME only for the user view as requested */}
+                          <p className="font-black text-gray-900 group-hover:text-malawi-green transition-colors text-sm uppercase tracking-tight">{referredUser?.fullName}</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-black">Level {ref.level} • {new Date(ref.timestamp).toLocaleDateString()}</p>
                         </div>
                       </div>
                       <div className="text-right">

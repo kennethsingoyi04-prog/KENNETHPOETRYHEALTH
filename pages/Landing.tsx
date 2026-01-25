@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
@@ -119,7 +120,7 @@ const Landing: React.FC = () => {
                 <TrendingUp size={32} />
               </div>
               <h3 className="text-2xl font-black uppercase tracking-tight">Multi-Level</h3>
-              <p className="text-gray-500 leading-relaxed">Earn up to 15% combined commission from your direct and indirect network. Build a legacy of passive income.</p>
+              <p className="text-gray-500 leading-relaxed">Earn consistent commissions from your direct and indirect network. Build a legacy of passive income.</p>
             </div>
             <div className="p-12 rounded-[3.5rem] bg-gray-50 border border-gray-100 space-y-6 hover:shadow-xl transition-all hover:bg-white group">
               <div className="w-16 h-16 bg-malawi-black/10 text-malawi-black rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
