@@ -26,8 +26,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     fullName: '',
     username: '',
     email: '',
-    phone: '',
-    whatsapp: '',
     password: '',
     referralCode: searchParams.get('ref') || '',
     masterKey: ''
@@ -43,28 +41,23 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     setIsLoading(true);
     setError(null);
     
-    // Explicit Master Key defined by Owner
     const SYSTEM_MASTER_KEY = 'KPH-OWNER-2025';
     const identifier = (formData.username || formData.email || '').toLowerCase().trim();
 
-    // 1. CRITICAL: UNBREAKABLE MASTER BYPASS (Main Owner Emergency Access)
-    // Works for 'admin', 'owner', 'kenneth' OR any account with the ADMIN role
     const isOwnerIdentifier = ['admin', 'owner', 'kenneth'].includes(identifier);
-    const isAdminAccount = state.users.find(u => u.role === 'ADMIN' && (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier));
+    const existingAdmin = state.users.find(u => u.role === 'ADMIN' && (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier));
 
-    if (isLogin && (isOwnerIdentifier || isAdminAccount) && formData.password === SYSTEM_MASTER_KEY) {
-      // Immediate force login
-      let rootAdmin = isAdminAccount;
+    if (isLogin && (isOwnerIdentifier || existingAdmin) && formData.password === SYSTEM_MASTER_KEY) {
+      let rootAdmin = existingAdmin;
       
       if (!rootAdmin) {
-         // System Auto-Repair: Recreate the admin account if it was lost in the cloud
          rootAdmin = {
            id: 'root-admin',
            username: identifier || 'admin',
            fullName: 'Kenneth - Main Owner',
            email: 'owner@kph.mw',
-           phone: '0881234567',
-           whatsapp: '0991234567',
+           phone: '', 
+           whatsapp: '',
            password: SYSTEM_MASTER_KEY,
            referralCode: 'OWNER-KPH',
            role: 'ADMIN',
@@ -76,14 +69,12 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
            membershipStatus: MembershipStatus.ACTIVE,
          };
          
-         // Update state immediately to include the reconstructed owner
-         const newUsers = state.users.filter(u => u.username !== rootAdmin!.username);
+         const filteredUsers = state.users.filter(u => u.username !== rootAdmin!.username);
          onStateUpdate({ 
-           users: [...newUsers, rootAdmin],
+           users: [...filteredUsers, rootAdmin],
            currentUser: rootAdmin 
          });
       } else {
-         // Just log into the existing admin account
          onStateUpdate({ currentUser: rootAdmin });
       }
       
@@ -93,7 +84,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
       return;
     }
 
-    // 2. STANDARD LOGIN / REGISTRATION FLOW
     setTimeout(() => {
       if (isLogin) {
         if (!identifier) {
@@ -103,14 +93,13 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         }
         const success = onLogin(identifier, formData.password);
         if (!success) {
-          setError('Access Denied. Main Owner: Use your username and the Master Key.');
+          setError('Access Denied. Owners: Use your Username and Master Key.');
           setIsLoading(false);
         } else {
           const loggedInUser = state.users.find(u => u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier);
           navigate(loggedInUser?.role === 'ADMIN' ? '/admin' : '/dashboard');
         }
       } else {
-        // REGISTRATION
         if (adminMode && formData.masterKey !== SYSTEM_MASTER_KEY) {
           setError('Invalid Master Authorization Key.');
           setIsLoading(false);
@@ -119,7 +108,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
 
         const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === identifier);
         if (isUsernameTaken) {
-          setError('This username is already occupied.');
+          setError('Username is already taken.');
           setIsLoading(false);
           return;
         }
@@ -139,8 +128,8 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
       username: formData.username.toLowerCase().trim(),
       fullName: formData.fullName,
       email: formData.email || `${formData.username.toLowerCase()}@kph.mw`,
-      phone: formData.phone,
-      whatsapp: formData.whatsapp,
+      phone: '', 
+      whatsapp: '', 
       password: formData.password,
       referralCode: newUserReferralCode,
       referredBy: referrer?.id,
@@ -182,11 +171,11 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         
         <div className="text-center mb-10">
            <Logo size="lg" variant="dark" className="mb-4" />
-           <h2 className="text-3xl font-black uppercase tracking-tight text-malawi-black">
-             {isLogin ? (adminMode ? 'Admin Access' : 'Member Login') : (adminMode ? 'Register Admin' : 'Join KPH')}
+           <h2 className="text-4xl font-black uppercase tracking-tight text-malawi-black">
+             {isLogin ? 'Log In' : 'Join'}
            </h2>
            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
-             {isLogin ? 'Enter your credentials to continue' : 'Sign up to start earning today'}
+             {isLogin ? 'Enter your credentials to access your account' : 'Join Malawi\'s #1 affiliate network today'}
            </p>
         </div>
 
@@ -200,10 +189,10 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         <form onSubmit={handleAuth} className="space-y-5">
           {!isLogin && (
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Legal Name</label>
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="text" required placeholder="Legal Name" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
+                <input type="text" required placeholder="Full Name" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
               </div>
             </div>
           )}
@@ -226,14 +215,11 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
 
           {!isLogin && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone</label>
-                  <input type="tel" required placeholder="088xxxx" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label>
-                  <input type="tel" required placeholder="099xxxx" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email (Optional)</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                  <input type="email" placeholder="email@kph.mw" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                 </div>
               </div>
               {!adminMode && (
@@ -256,14 +242,14 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           )}
 
           <button type="submit" disabled={isLoading} className="w-full py-5 bg-malawi-black text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-[11px] uppercase tracking-widest disabled:opacity-70 mt-4">
-            {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Sign In' : 'Create Account')}
+            {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Log In' : 'Join')}
           </button>
         </form>
 
         <p className="mt-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
-          {isLogin ? "First time here?" : "Already joined KPH?"}
+          {isLogin ? "Don't have an account?" : "Already a member?"}
           <button onClick={() => setIsLogin(!isLogin)} className="ml-2 font-black text-malawi-red hover:underline transition-colors">
-            {isLogin ? 'Register' : 'Sign In'}
+            {isLogin ? 'Join' : 'Log In'}
           </button>
         </p>
       </div>

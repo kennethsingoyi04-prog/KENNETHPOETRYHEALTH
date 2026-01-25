@@ -45,8 +45,8 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState({
     fullName: user.fullName,
-    phone: user.phone,
-    whatsapp: user.whatsapp,
+    phone: user.phone || '',
+    whatsapp: user.whatsapp || '',
     email: user.email,
     location: user.location || '',
     bio: user.bio || ''
@@ -72,8 +72,8 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   useEffect(() => {
     setEditFormData({
       fullName: user.fullName,
-      phone: user.phone,
-      whatsapp: user.whatsapp,
+      phone: user.phone || '',
+      whatsapp: user.whatsapp || '',
       email: user.email,
       location: user.location || '',
       bio: user.bio || ''
@@ -221,7 +221,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                             <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
                             <input type="tel" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}/>
                           </div>
-                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Smartphone size={16} className="text-gray-300"/>{user.phone}</p>}
+                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Smartphone size={16} className="text-gray-300"/>{user.phone || 'Not provided'}</p>}
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">WhatsApp Contact</label>
@@ -230,7 +230,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                             <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-malawi-green" size={16}/>
                             <input type="tel" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.whatsapp} onChange={(e) => setEditFormData({...editFormData, whatsapp: e.target.value})}/>
                           </div>
-                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Smartphone size={16} className="text-malawi-green"/>{user.whatsapp || 'Not set'}</p>}
+                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Smartphone size={16} className="text-malawi-green"/>{user.whatsapp || 'Not provided'}</p>}
                       </div>
                    </div>
 

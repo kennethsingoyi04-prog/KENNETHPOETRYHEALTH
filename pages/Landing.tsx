@@ -51,13 +51,13 @@ const Landing: React.FC = () => {
                 onClick={() => navigate('/auth?type=signup')}
                 className="group bg-malawi-green hover:bg-green-700 text-white font-black py-6 px-12 rounded-[2rem] flex items-center justify-center gap-4 shadow-[0_20px_60px_rgba(17,129,49,0.4)] transition-all active:scale-95 text-xl uppercase tracking-wider"
               >
-                Join Now <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform" />
+                Join <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform" />
               </button>
               <button 
                 onClick={() => navigate('/auth?type=login')}
                 className="bg-white/5 hover:bg-white/10 text-white font-black py-6 px-12 rounded-[2rem] border border-white/10 transition-all flex items-center justify-center gap-2 text-xl backdrop-blur-md uppercase tracking-wider"
               >
-                Member Portal
+                Log In
               </button>
             </div>
           </div>

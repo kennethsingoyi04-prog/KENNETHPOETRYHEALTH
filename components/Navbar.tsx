@@ -59,11 +59,21 @@ const Navbar: React.FC<NavbarProps> = ({
 
   if (!currentUser) return (
     <nav className="bg-white text-malawi-black p-4 border-b border-gray-100 shadow-sm sticky top-0 z-50">
-      <div className="container mx-auto flex justify-between items-center">
+      <div className="container mx-auto flex justify-between items-center px-2">
         <Link to="/"><Logo variant="dark" size="sm" /></Link>
-        <div className="flex items-center gap-4">
-           <button onClick={() => navigate('/auth?type=login')} className="text-xs font-black uppercase tracking-widest">Login</button>
-           <button onClick={() => navigate('/auth?type=signup')} className="bg-malawi-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Join Now</button>
+        <div className="flex items-center gap-6">
+           <button 
+             onClick={() => navigate('/auth?type=login')} 
+             className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-malawi-black transition-colors"
+           >
+             Log In
+           </button>
+           <button 
+             onClick={() => navigate('/auth?type=signup')} 
+             className="bg-malawi-black text-white px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-malawi-green transition-all active:scale-95"
+           >
+             Join
+           </button>
         </div>
       </div>
     </nav>

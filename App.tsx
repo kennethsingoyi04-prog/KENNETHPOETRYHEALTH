@@ -144,14 +144,19 @@ const App: React.FC = () => {
     
     // Check local user list for matches
     // Allow standard password OR Master Key for Admin accounts
-    const user = state.users.find(u => 
+    const userIndex = state.users.findIndex(u => 
       (u.email.toLowerCase() === identifier.toLowerCase() || u.username.toLowerCase() === identifier.toLowerCase()) && 
       (u.password === password || (u.role === 'ADMIN' && password === MASTER_KEY))
     );
 
-    if (user) {
+    if (userIndex !== -1) {
+      const user = state.users[userIndex];
+      const updatedUser = { ...user, lastLoginAt: new Date().toISOString() };
+      const updatedUsers = [...state.users];
+      updatedUsers[userIndex] = updatedUser;
+      
       localStorage.setItem(SESSION_KEY, user.id);
-      updateUserState({ currentUser: user });
+      updateUserState({ users: updatedUsers, currentUser: updatedUser });
       return true;
     }
     return false;

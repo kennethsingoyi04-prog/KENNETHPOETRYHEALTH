@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppState, MembershipStatus, BookSellerStatus } from '../types';
+import { AppState, MembershipStatus, BookSellerStatus, User } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -18,7 +17,11 @@ import {
   TrendingDown,
   BookOpen,
   ArrowRight,
-  MapPin
+  MapPin,
+  ChevronDown,
+  User as UserIcon,
+  Search,
+  Network
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -51,6 +54,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAskingAI, setIsAskingAI] = useState(false);
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
@@ -76,6 +80,41 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
   };
 
   const showBookSellingCTA = !user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE;
+
+  // Build Hierarchy Data
+  const networkTree = useMemo(() => {
+    const level1 = state.users.filter(u => u.referredBy === user.id);
+    return level1.map(l1 => ({
+      ...l1,
+      children: state.users.filter(u => u.referredBy === l1.id)
+    }));
+  }, [state.users, user.id]);
+
+  // Added key to props type to satisfy TS when component is used in .map()
+  const NetworkNode = ({ targetUser, level, isRoot = false }: { targetUser: User, level: number, isRoot?: boolean, key?: React.Key }) => (
+    <div className="flex flex-col items-center group">
+      <div className={`relative flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-300 ${
+        isRoot ? 'bg-malawi-black border-malawi-green text-white shadow-xl scale-110 mb-4' : 
+        targetUser.membershipStatus === MembershipStatus.ACTIVE ? 'bg-white border-malawi-green shadow-md hover:scale-105' : 'bg-gray-50 border-gray-100 opacity-60'
+      }`}>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm uppercase ${
+          isRoot ? 'bg-malawi-green text-white' : 
+          targetUser.membershipStatus === MembershipStatus.ACTIVE ? 'bg-malawi-black text-white' : 'bg-gray-200 text-gray-400'
+        }`}>
+          {targetUser.fullName.charAt(0)}
+        </div>
+        <div className="mt-2 text-center">
+          <p className="text-[9px] font-black uppercase truncate max-w-[80px]">{targetUser.fullName.split(' ')[0]}</p>
+          {!isRoot && <p className="text-[7px] font-bold text-gray-400 uppercase">{targetUser.membershipTier}</p>}
+        </div>
+        {targetUser.membershipStatus === MembershipStatus.ACTIVE && !isRoot && (
+           <div className="absolute -top-1 -right-1 bg-malawi-green text-white p-0.5 rounded-full ring-2 ring-white">
+             <CheckCircle size={8} />
+           </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 pb-24 animate-in fade-in duration-700">
@@ -103,7 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
       </header>
 
-      {/* Book Selling CTA - Priority Visibility */}
+      {/* Book Selling CTA */}
       {showBookSellingCTA && (
         <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top-4 duration-500 ring-4 ring-malawi-red/10">
           <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6">
@@ -192,37 +231,81 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
 
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-[2.5rem] border shadow-sm h-full flex flex-col overflow-hidden max-h-[600px]">
+          <div className="bg-white rounded-[2.5rem] border shadow-sm h-full flex flex-col overflow-hidden max-h-[700px]">
             <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
-               <h3 className="font-black text-xs uppercase tracking-widest">Network Directory</h3>
-               <span className="text-[8px] font-black bg-malawi-green text-white px-2 py-0.5 rounded uppercase">Live Data</span>
+               <h3 className="font-black text-xs uppercase tracking-widest">Network Visualization</h3>
+               <div className="flex bg-gray-200 p-1 rounded-xl">
+                 <button onClick={() => setViewMode('map')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'map' ? 'bg-white text-malawi-black shadow-sm' : 'text-gray-400'}`}><Network size={14} /></button>
+                 <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-malawi-black shadow-sm' : 'text-gray-400'}`}><TrendingDown size={14} /></button>
+               </div>
             </div>
-            <div className="flex-grow overflow-y-auto divide-y">
-              {myReferrals.length === 0 ? (
-                <div className="p-12 text-center text-gray-300 italic text-xs uppercase font-black">No team members yet</div>
-              ) : (
-                myReferrals.map(ref => {
-                  const target = state.users.find(u => u.id === ref.referredId);
-                  return (
-                    <div key={ref.id} className="p-5 hover:bg-gray-50 transition-colors group">
-                       <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-malawi-black rounded-xl flex items-center justify-center text-white font-black uppercase group-hover:bg-malawi-green transition-colors">{target?.fullName.charAt(0)}</div>
-                          <div className="flex-grow">
-                             <p className="text-xs font-black uppercase tracking-tight">{target?.fullName}</p>
-                             <div className="flex items-center gap-2 mt-0.5">
-                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${target?.membershipStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                  {target?.membershipTier} {target?.membershipStatus === 'PENDING' ? '(WAITING)' : ''}
-                                </span>
-                             </div>
-                          </div>
-                          <div className="text-right">
-                             <p className="text-[10px] font-black text-malawi-green">+K{ref.commission.toLocaleString()}</p>
-                             <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">L{ref.level}</p>
-                          </div>
-                       </div>
+            
+            <div className="flex-grow overflow-auto p-6 bg-gray-50/30">
+              {viewMode === 'map' ? (
+                <div className="min-w-fit flex flex-col items-center">
+                  <NetworkNode targetUser={user} level={0} isRoot />
+                  
+                  {networkTree.length === 0 ? (
+                    <div className="mt-8 text-center text-gray-300 italic text-[10px] uppercase font-black max-w-[150px]">
+                      Your network is empty. Recruit others to see your tree grow!
                     </div>
-                  );
-                })
+                  ) : (
+                    <div className="mt-4 flex gap-8 items-start relative">
+                      {/* Level 1 Container */}
+                      {networkTree.map((l1Node, idx) => (
+                        <div key={l1Node.id} className="flex flex-col items-center relative">
+                          {/* Connecting Line to Root */}
+                          <div className="absolute -top-4 w-px h-4 bg-gray-200"></div>
+                          
+                          <NetworkNode targetUser={l1Node} level={1} />
+                          
+                          {/* Level 2 Container */}
+                          {l1Node.children.length > 0 && (
+                            <div className="mt-6 flex gap-4 border-t pt-4 border-gray-100">
+                              {l1Node.children.slice(0, 3).map(l2 => (
+                                <NetworkNode key={l2.id} targetUser={l2} level={2} />
+                              ))}
+                              {l1Node.children.length > 3 && (
+                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[8px] font-black text-gray-400">
+                                  +{l1Node.children.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="divide-y -mx-6">
+                  {myReferrals.length === 0 ? (
+                    <div className="p-12 text-center text-gray-300 italic text-xs uppercase font-black">No team members yet</div>
+                  ) : (
+                    myReferrals.map(ref => {
+                      const target = state.users.find(u => u.id === ref.referredId);
+                      return (
+                        <div key={ref.id} className="p-5 hover:bg-gray-50 transition-colors group">
+                           <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-malawi-black rounded-xl flex items-center justify-center text-white font-black uppercase group-hover:bg-malawi-green transition-colors">{target?.fullName.charAt(0)}</div>
+                              <div className="flex-grow">
+                                 <p className="text-xs font-black uppercase tracking-tight">{target?.fullName}</p>
+                                 <div className="flex items-center gap-2 mt-0.5">
+                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${target?.membershipStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                      {target?.membershipTier} {target?.membershipStatus === 'PENDING' ? '(WAITING)' : ''}
+                                    </span>
+                                 </div>
+                              </div>
+                              <div className="text-right">
+                                 <p className="text-[10px] font-black text-malawi-green">+K{ref.commission.toLocaleString()}</p>
+                                 <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">L{ref.level}</p>
+                              </div>
+                           </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               )}
             </div>
           </div>

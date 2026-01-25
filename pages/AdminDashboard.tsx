@@ -6,7 +6,7 @@ import Logo from '../components/Logo';
 import { syncAppStateToCloud } from '../dataService';
 import { 
   ShieldCheck, RefreshCw, Search, 
-  X, Wallet, Users, Zap, Loader2, Monitor, MessageSquare, Check, CheckCircle2, Gavel, ShieldAlert, ImageIcon, Eye, BookOpen, UserCheck, UserX, MapPin, Smartphone, Clock, Calendar, Ban, UserCog, Award
+  X, Wallet, Users, Zap, Loader2, Monitor, MessageSquare, Check, CheckCircle2, Gavel, ShieldAlert, ImageIcon, Eye, BookOpen, UserCheck, UserX, MapPin, Smartphone, Clock, Calendar, Ban, UserCog, Award, Circle
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -133,6 +133,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [state.users, searchText]);
 
+  const getUserOnlineStatus = (user: User) => {
+    if (!user.lastLoginAt) return false;
+    const lastLogin = new Date(user.lastLoginAt).getTime();
+    const now = new Date().getTime();
+    return (now - lastLogin) < 5 * 60 * 1000; // Online if active in last 5 minutes
+  };
+
   return (
     <div className="max-w-7xl mx-auto pb-32 animate-in fade-in duration-700">
       {viewingProofUrl && (
@@ -147,11 +154,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
               <div className={`p-10 text-white flex items-center justify-between rounded-t-[4rem] ${inspectingUser.isBanned ? 'bg-malawi-red' : 'bg-malawi-black'}`}>
                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-2xl border border-white/20">
-                      {inspectingUser.fullName.charAt(0)}
+                    <div className="relative">
+                      <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-2xl border border-white/20">
+                        {inspectingUser.fullName.charAt(0)}
+                      </div>
+                      <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white ${getUserOnlineStatus(inspectingUser) ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                     </div>
                     <div>
-                       <h2 className="text-3xl font-black uppercase tracking-tight">{inspectingUser.fullName}</h2>
+                       <div className="flex items-center gap-3">
+                          <h2 className="text-3xl font-black uppercase tracking-tight">{inspectingUser.fullName}</h2>
+                          {getUserOnlineStatus(inspectingUser) && <span className="text-[8px] font-black bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30 uppercase tracking-[0.2em] animate-pulse">Online Now</span>}
+                       </div>
                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">@{inspectingUser.username} • {inspectingUser.membershipTier}</p>
                     </div>
                  </div>
@@ -170,9 +183,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                     </div>
                     <div className="bg-gray-50 p-6 rounded-[2rem] border">
                        <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Account Status</p>
-                       <p className={`text-xs font-black uppercase px-3 py-1 rounded-full inline-block ${inspectingUser.isBanned ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                          {inspectingUser.isBanned ? 'Banned / Suspended' : 'Active'}
-                       </p>
+                       <div className="flex items-center gap-2">
+                          <p className={`text-xs font-black uppercase px-3 py-1 rounded-full inline-block ${inspectingUser.isBanned ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                             {inspectingUser.isBanned ? 'Banned / Suspended' : 'Active'}
+                          </p>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase italic">
+                            Last active: {inspectingUser.lastLoginAt ? new Date(inspectingUser.lastLoginAt).toLocaleString() : 'Never'}
+                          </span>
+                       </div>
                     </div>
                  </div>
 
@@ -402,8 +420,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                        <tr key={u.id} className={`hover:bg-gray-50/50 ${u.isBanned ? 'bg-red-50/30' : ''}`}>
                           <td className="px-10 py-8">
                              <div className="flex items-center gap-3">
-                                {u.isBanned && <Ban size={14} className="text-malawi-red" />}
-                                {u.role === 'ADMIN' && <ShieldCheck size={14} className="text-malawi-green" />}
+                                <div className="relative">
+                                  {u.isBanned ? <Ban size={14} className="text-malawi-red" /> : u.role === 'ADMIN' ? <ShieldCheck size={14} className="text-malawi-green" /> : <Users size={14} className="text-gray-400" />}
+                                  <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white ${getUserOnlineStatus(u) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                </div>
                                 <div>
                                    <p className={`font-black uppercase tracking-tight ${u.isBanned ? 'text-malawi-red' : ''}`}>{u.fullName}</p>
                                    <p className="text-[10px] text-gray-400">@{u.username}</p>
