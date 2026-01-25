@@ -11,7 +11,7 @@ import {
   Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
   Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode, Settings2,
   BookOpen, Eye, User as UserIcon, Mail, Phone, Hash, Calendar, DollarSign,
-  UserCheck, Smartphone, Clock, ListChecks, ArrowRight
+  UserCheck, Smartphone, Clock, ListChecks, ArrowRight, Gavel, AlertTriangle, Ban
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -32,6 +32,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
   const [inspectingUser, setInspectingUser] = useState<User | null>(null);
   const [payoutNote, setPayoutNote] = useState<{ [key: string]: string }>({});
+
+  // Safety State
+  const [adminActionReason, setAdminActionReason] = useState("");
+  const [banDurationDays, setBanDurationDays] = useState("7");
 
   const SUPABASE_SQL = `-- 1. Create the main data storage table
 CREATE TABLE IF NOT EXISTS public.app_state (
@@ -134,6 +138,67 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
       w.id === id ? { ...w, status, adminNote: payoutNote[id] || '' } : w
     );
     onStateUpdate({ withdrawals: updatedWithdrawals });
+  };
+
+  const handleIssueWarning = () => {
+    if (!inspectingUser || !adminActionReason.trim()) return;
+    const updatedUsers = state.users.map(u => 
+      u.id === inspectingUser.id 
+        ? { ...u, warnings: [...(u.warnings || []), adminActionReason.trim()] } 
+        : u
+    );
+    onStateUpdate({ users: updatedUsers });
+    setAdminActionReason("");
+    setInspectingUser(updatedUsers.find(u => u.id === inspectingUser.id) || null);
+    alert("Warning issued to " + inspectingUser.fullName);
+  };
+
+  const handleBanUser = (type: 'PERMANENT' | 'TEMPORARY') => {
+    if (!inspectingUser || !adminActionReason.trim()) {
+      alert("Please provide a reason for the ban.");
+      return;
+    }
+    
+    let expiresAt = undefined;
+    if (type === 'TEMPORARY') {
+      const date = new Date();
+      date.setDate(date.getDate() + parseInt(banDurationDays));
+      expiresAt = date.toISOString();
+    }
+
+    const updatedUsers = state.users.map(u => 
+      u.id === inspectingUser.id 
+        ? { 
+            ...u, 
+            isBanned: true, 
+            banType: type, 
+            banReason: adminActionReason.trim(),
+            banExpiresAt: expiresAt
+          } 
+        : u
+    );
+    onStateUpdate({ users: updatedUsers });
+    setAdminActionReason("");
+    setInspectingUser(updatedUsers.find(u => u.id === inspectingUser.id) || null);
+    alert(`${type} ban applied to ${inspectingUser.fullName}`);
+  };
+
+  const handleUnbanUser = () => {
+    if (!inspectingUser) return;
+    const updatedUsers = state.users.map(u => 
+      u.id === inspectingUser.id 
+        ? { 
+            ...u, 
+            isBanned: false, 
+            banType: undefined, 
+            banReason: undefined,
+            banExpiresAt: undefined
+          } 
+        : u
+    );
+    onStateUpdate({ users: updatedUsers });
+    setInspectingUser(updatedUsers.find(u => u.id === inspectingUser.id) || null);
+    alert("User has been unbanned.");
   };
 
   const filteredWithdrawals = useMemo(() => {
@@ -253,6 +318,104 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                              <MessageSquareWarning size={16} className="text-malawi-green" />
                              <a href={`https://wa.me/${inspectingUser.whatsapp}`} className="text-sm font-black text-malawi-green hover:underline">WhatsApp Portal</a>
                           </div>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* Safety & Discipline Section */}
+                 <div className="bg-red-50 p-10 rounded-[4rem] border border-red-100 space-y-8">
+                    <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className="bg-malawi-red text-white p-3 rounded-2xl shadow-lg">
+                             <Gavel size={24} />
+                          </div>
+                          <div>
+                             <h4 className="text-xl font-black uppercase tracking-tight text-malawi-red">Safety & Discipline</h4>
+                             <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Enforce Platform Terms of Service</p>
+                          </div>
+                       </div>
+                       {inspectingUser.isBanned && (
+                          <div className="bg-red-600 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl animate-pulse">
+                             Current Status: {inspectingUser.banType} BANNED
+                          </div>
+                       )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                       <div className="space-y-6">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-red-400 ml-1">Action Reason / Warning Note</label>
+                             <textarea 
+                                value={adminActionReason}
+                                onChange={(e) => setAdminActionReason(e.target.value)}
+                                className="w-full p-6 bg-white border border-red-200 rounded-[2rem] text-sm font-medium focus:ring-4 focus:ring-red-100 outline-none resize-none"
+                                rows={4}
+                                placeholder="Explain why you are warning or banning this user..."
+                             />
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-3">
+                             <button 
+                                onClick={handleIssueWarning}
+                                className="px-6 py-3 bg-yellow-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-yellow-600 transition-all active:scale-95 flex items-center gap-2"
+                             >
+                                <AlertTriangle size={16} /> Issue Official Warning
+                             </button>
+                             {inspectingUser.isBanned ? (
+                                <button 
+                                   onClick={handleUnbanUser}
+                                   className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 transition-all active:scale-95 flex items-center gap-2"
+                                >
+                                   <ShieldCheck size={16} /> Lift All Restrictions
+                                </button>
+                             ) : (
+                                <>
+                                   <button 
+                                      onClick={() => handleBanUser('PERMANENT')}
+                                      className="px-6 py-3 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-2"
+                                   >
+                                      <Ban size={16} /> Permanent Ban
+                                   </button>
+                                   <div className="flex gap-2">
+                                      <input 
+                                         type="number" 
+                                         className="w-16 p-3 bg-white border rounded-xl text-center text-xs font-black"
+                                         value={banDurationDays}
+                                         onChange={(e) => setBanDurationDays(e.target.value)}
+                                      />
+                                      <button 
+                                         onClick={() => handleBanUser('TEMPORARY')}
+                                         className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95"
+                                      >
+                                         Temp Ban (Days)
+                                      </button>
+                                   </div>
+                                </>
+                             )}
+                          </div>
+                       </div>
+
+                       <div className="bg-white p-8 rounded-[3rem] border border-red-100 space-y-4 max-h-[250px] overflow-y-auto">
+                          <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Discipline History</h5>
+                          {inspectingUser.isBanned && (
+                             <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
+                                <p className="text-[10px] font-black text-red-600 uppercase">ACTIVE BAN: {inspectingUser.banType}</p>
+                                <p className="text-xs font-bold text-gray-700 mt-1 italic">"{inspectingUser.banReason}"</p>
+                                {inspectingUser.banExpiresAt && <p className="text-[9px] text-gray-400 mt-2">Expires: {new Date(inspectingUser.banExpiresAt).toLocaleString()}</p>}
+                             </div>
+                          )}
+                          {(inspectingUser.warnings?.length || 0) > 0 ? (
+                             <div className="space-y-3">
+                                {inspectingUser.warnings?.map((w, idx) => (
+                                   <div key={idx} className="p-4 bg-yellow-50 border border-yellow-100 rounded-2xl flex items-start gap-3">
+                                      <AlertTriangle size={14} className="text-yellow-600 shrink-0 mt-0.5" />
+                                      <p className="text-xs font-bold text-gray-700 leading-tight">Warning #{idx+1}: {w}</p>
+                                   </div>
+                                ))}
+                             </div>
+                          ) : (
+                             <p className="text-center py-10 text-gray-300 text-[10px] font-black uppercase italic">No warnings issued yet</p>
+                          )}
                        </div>
                     </div>
                  </div>
@@ -399,8 +562,17 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                     {filteredUsers.map(u => (
                        <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-10 py-8">
-                             <p className="font-black text-malawi-black">{u.fullName}</p>
-                             <p className="text-[10px] text-gray-400 uppercase tracking-widest">@{u.username}</p>
+                             <div className="flex items-center gap-3">
+                                <div>
+                                   <p className="font-black text-malawi-black">{u.fullName}</p>
+                                   <p className="text-[10px] text-gray-400 uppercase tracking-widest">@{u.username}</p>
+                                </div>
+                                {u.isBanned && (
+                                   <span className="bg-red-600 text-white p-1 rounded-lg" title="BANNED USER">
+                                      <Ban size={12} />
+                                   </span>
+                                )}
+                             </div>
                           </td>
                           <td className="px-10 py-8">
                              <p className="font-black text-malawi-green">MWK {u.balance.toLocaleString()}</p>

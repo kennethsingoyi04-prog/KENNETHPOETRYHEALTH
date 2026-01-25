@@ -58,6 +58,10 @@ export interface User {
   createdAt: string;
   lastLoginAt?: string; 
   isBanned?: boolean;
+  banReason?: string;
+  banType?: 'PERMANENT' | 'TEMPORARY';
+  banExpiresAt?: string;
+  warnings?: string[];
   password?: string;
   profilePic?: string;
   bio?: string;

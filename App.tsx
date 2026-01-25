@@ -16,7 +16,7 @@ import Navbar from './components/Navbar';
 import Logo from './components/Logo';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
 import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth } from './dataService';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft } from 'lucide-react';
 
 const SESSION_KEY = 'kph_session_uid';
 
@@ -119,6 +119,14 @@ const App: React.FC = () => {
       (!u.password || u.password === password)
     );
     if (user) {
+      // Check for active temporary ban expiry
+      if (user.isBanned && user.banType === 'TEMPORARY' && user.banExpiresAt) {
+        if (new Date() > new Date(user.banExpiresAt)) {
+          // Ban expired
+          user.isBanned = false;
+        }
+      }
+
       const now = new Date().toISOString();
       const updatedUser = { ...user, lastLoginAt: now };
       const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
@@ -145,6 +153,58 @@ const App: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // Handle Banned User View
+  if (state.currentUser?.isBanned && state.currentUser.role !== 'ADMIN') {
+    const isTemp = state.currentUser.banType === 'TEMPORARY';
+    const expires = state.currentUser.banExpiresAt ? new Date(state.currentUser.banExpiresAt) : null;
+    const stillBanned = !isTemp || (expires && expires > new Date());
+
+    if (stillBanned) {
+      return (
+        <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
+          <div className="w-24 h-24 bg-malawi-red rounded-full flex items-center justify-center mb-8 shadow-2xl shadow-red-500/20 animate-bounce">
+            <Ban size={48} />
+          </div>
+          <h1 className="text-4xl font-black uppercase tracking-tight mb-4">Account Restricted</h1>
+          <p className="text-gray-400 max-w-md mb-8">
+            Access to your KENNETHPOETRYHEALTH account has been suspended by the administration for violating platform policies.
+          </p>
+          
+          <div className="bg-white/5 border border-white/10 p-8 rounded-[3rem] w-full max-w-lg mb-8">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-malawi-red">
+                <span>Violation Record</span>
+                <span className="bg-malawi-red text-white px-3 py-1 rounded-full">{state.currentUser.banType}</span>
+              </div>
+              <p className="text-xl font-bold italic">"{state.currentUser.banReason || 'Platform Terms of Service Violation'}"</p>
+              {isTemp && expires && (
+                <p className="text-xs text-gray-500 pt-2 border-t border-white/5">
+                  Restrictions will be lifted on: <span className="text-white font-black">{expires.toLocaleString()}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 w-full max-w-xs">
+            <a 
+              href={`https://wa.me/${state.users.find(u => u.isOwner)?.whatsapp}`} 
+              target="_blank" 
+              className="bg-malawi-green text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+            >
+              <MessageCircle size={18} /> Appeal on WhatsApp
+            </a>
+            <button 
+              onClick={logout} 
+              className="bg-white/10 hover:bg-white/20 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+            >
+              <ArrowLeft size={18} /> Logout
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (
