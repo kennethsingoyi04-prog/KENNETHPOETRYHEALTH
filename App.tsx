@@ -40,48 +40,58 @@ const App: React.FC = () => {
     complaints: []
   });
 
+  // Background sync logic that respects the current login state
   const fetchAndMergeCloudState = async () => {
     const cloudData = await fetchAppStateFromCloud();
     if (cloudData) {
-      const savedUid = localStorage.getItem(SESSION_KEY);
       const cloudUsers = cloudData.users || [];
       
-      let sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
-      
-      if (!sessionUser && state.currentUser) {
-        sessionUser = cloudUsers.find(u => u.username === state.currentUser?.username);
-      }
-      
-      if (sessionUser?.isBanned && sessionUser.banType === 'TEMPORARY' && sessionUser.banExpiresAt) {
-         if (new Date() > new Date(sessionUser.banExpiresAt)) {
-            sessionUser.isBanned = false;
-         }
-      }
+      setState(prev => {
+        // Only recover or refresh the user if we already have a session active in state
+        // This prevents the "automatic relogging" loop during background refreshes
+        let updatedCurrentUser = prev.currentUser;
+        
+        if (prev.currentUser) {
+          const refreshed = cloudUsers.find(u => u.id === prev.currentUser?.id);
+          if (refreshed) updatedCurrentUser = refreshed;
+        }
 
-      setState(prev => ({
-        ...prev,
-        ...cloudData,
-        currentUser: sessionUser || prev.currentUser
-      }));
-      
-      if (sessionUser) {
-        localStorage.setItem(SESSION_KEY, sessionUser.id);
-      }
+        return {
+          ...prev,
+          ...cloudData,
+          currentUser: updatedCurrentUser
+        };
+      });
     }
   };
 
   useEffect(() => {
     const initApp = async () => {
+      // 1. Load basic UI state from local storage
       const localData = loadFromLocal();
       if (localData) {
         setState(prev => ({ ...prev, ...localData }));
       }
 
+      // 2. Check cloud health and pull fresh data
       const health = await checkCloudHealth();
       setIsOnline(health.ok);
 
       if (health.ok) {
-        await fetchAndMergeCloudState();
+        const cloudData = await fetchAppStateFromCloud();
+        if (cloudData) {
+          const savedUid = localStorage.getItem(SESSION_KEY);
+          const cloudUsers = cloudData.users || [];
+          
+          // Initial boot: log in only if savedUid is physically in storage
+          const sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
+          
+          setState(prev => ({
+            ...prev,
+            ...cloudData,
+            currentUser: sessionUser
+          }));
+        }
       }
       
       setIsReady(true);
@@ -107,11 +117,9 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       const success = await syncAppStateToCloud(state);
-      if (success) {
-        setHasUnsavedChanges(false);
-      }
-    } catch (e: any) {
-      console.error(e.message);
+      if (success) setHasUnsavedChanges(false);
+    } catch (e) {
+      console.error("Sync error:", e);
     } finally {
       setIsSyncing(false);
     }
@@ -121,11 +129,13 @@ const App: React.FC = () => {
     setState(prev => {
       const newState = { ...prev, ...updatedState };
       
-      if (updatedState.currentUser) {
-        localStorage.setItem(SESSION_KEY, updatedState.currentUser.id);
-      } else if (updatedState.users && prev.currentUser) {
-        const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
-        if (refreshedUser) newState.currentUser = refreshedUser;
+      // Keep storage session in sync with manual state changes
+      if (updatedState.currentUser !== undefined) {
+        if (updatedState.currentUser) {
+          localStorage.setItem(SESSION_KEY, updatedState.currentUser.id);
+        } else {
+          localStorage.removeItem(SESSION_KEY);
+        }
       }
 
       saveToLocal(newState);
@@ -142,8 +152,6 @@ const App: React.FC = () => {
   const login = (identifier: string, password?: string) => {
     const MASTER_KEY = 'KPH-OWNER-2025';
     
-    // Check local user list for matches
-    // Allow standard password OR Master Key for Admin accounts
     const userIndex = state.users.findIndex(u => 
       (u.email.toLowerCase() === identifier.toLowerCase() || u.username.toLowerCase() === identifier.toLowerCase()) && 
       (u.password === password || (u.role === 'ADMIN' && password === MASTER_KEY))
@@ -155,6 +163,7 @@ const App: React.FC = () => {
       const updatedUsers = [...state.users];
       updatedUsers[userIndex] = updatedUser;
       
+      // Absolute login sequence
       localStorage.setItem(SESSION_KEY, user.id);
       updateUserState({ users: updatedUsers, currentUser: updatedUser });
       return true;
@@ -163,8 +172,10 @@ const App: React.FC = () => {
   };
 
   const logout = () => {
+    // Clear everything instantly to stop background sync races
     localStorage.removeItem(SESSION_KEY);
     setState(prev => ({ ...prev, currentUser: null }));
+    // Hard refresh to clear memory if needed, but state reset is enough
   };
 
   if (!isReady) {
@@ -173,40 +184,24 @@ const App: React.FC = () => {
         <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Restoring KPH Session...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Initializing Security...</p>
         </div>
       </div>
     );
   }
 
+  // Handle Banned State
   if (state.currentUser?.isBanned && state.currentUser.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="w-32 h-32 bg-malawi-red rounded-[2.5rem] flex items-center justify-center mb-10 shadow-2xl animate-bounce">
-          <Ban size={64} />
+        <div className="w-24 h-24 bg-malawi-red rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl animate-bounce">
+          <Ban size={48} />
         </div>
-        <h1 className="text-5xl font-black uppercase tracking-tighter mb-4 text-malawi-red">Access Revoked</h1>
-        <p className="text-gray-500 max-w-lg mb-12 font-bold uppercase tracking-widest text-xs">Administrative disciplinary action has been taken on your account.</p>
-        <div className="bg-white/5 border border-white/10 p-12 rounded-[3.5rem] w-full max-w-2xl mb-12 text-left relative overflow-hidden backdrop-blur-md">
-           <div className="relative z-10 space-y-6">
-              <div className="flex items-center gap-3 text-malawi-red">
-                 <ShieldAlert size={20} />
-                 <span className="text-[10px] font-black uppercase tracking-[0.2em]">Disciplinary Report</span>
-              </div>
-              <div className="space-y-2">
-                 <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Reason:</p>
-                 <p className="text-3xl font-black italic">"{state.currentUser.banReason || 'Standard Violation'}"</p>
-              </div>
-           </div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-5 w-full max-w-md">
-           <a href={`https://wa.me/265881234567`} target="_blank" className="flex-grow bg-malawi-green text-white font-black py-6 rounded-[2rem] uppercase text-xs tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3">
-             <MessageCircle size={20} /> Appeal Now
-           </a>
-           <button onClick={logout} className="px-12 bg-white/5 text-white font-black py-6 rounded-[2rem] border border-white/10 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-2">
-             <ArrowLeft size={16} /> Logout
-           </button>
-        </div>
+        <h1 className="text-4xl font-black uppercase tracking-tighter mb-2 text-malawi-red">Access Revoked</h1>
+        <p className="text-gray-500 max-w-md mb-10 font-bold uppercase tracking-widest text-[10px]">Your account has been restricted by system administration.</p>
+        <button onClick={logout} className="px-12 py-5 bg-white/5 text-white font-black rounded-2xl border border-white/10 uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-white/10">
+          <ArrowLeft size={16} /> Logout Securely
+        </button>
       </div>
     );
   }
