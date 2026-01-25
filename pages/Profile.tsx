@@ -64,7 +64,6 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   const [showSupportForm, setShowSupportForm] = useState(false);
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
 
-  // Reset edit form when user changes or edit mode toggles
   useEffect(() => {
     setEditFormData({
       fullName: user.fullName,
@@ -280,7 +279,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
 
                     <button disabled={isSubmittingBook} className="w-full py-6 bg-malawi-red text-white font-black rounded-[2rem] uppercase text-xs tracking-[0.2em] shadow-xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3">
                        {isSubmittingBook ? <Loader2 className="animate-spin" size={18}/> : <Send size={18}/>}
-                       {isSubmittingBook ? 'Sending...' : 'Send Application'}
+                       {isSubmittingBook ? 'SENDING...' : 'SEND APPLICATION'}
                     </button>
                     {user.bookSellerStatus === BookSellerStatus.REJECTED && <p className="text-center text-malawi-red font-black uppercase text-[10px]">Your previous request was declined. Please update your details and resend.</p>}
                   </form>
@@ -296,7 +295,6 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                 </div>
                 {showSupportForm ? (
                   <form onSubmit={handleSupportSubmit} className="space-y-4 animate-in slide-in-from-top-4">
-                    {/* Fixed: setSubject -> setSupportSubject */}
                     <input type="text" required placeholder="Ticket Subject" className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-black" value={supportSubject} onChange={e => setSupportSubject(e.target.value)} />
                     <textarea rows={6} required placeholder="Detail message..." className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium resize-none outline-none focus:ring-2 focus:ring-malawi-black" value={supportMessage} onChange={e => setSupportMessage(e.target.value)} />
                     <button type="submit" disabled={isSubmittingSupport || isUploading} className="w-full bg-malawi-black text-white font-black py-4 rounded-3xl uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50">

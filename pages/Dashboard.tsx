@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppState, MembershipStatus, BookSellerStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
@@ -15,7 +16,9 @@ import {
   CheckCircle,
   RefreshCw,
   TrendingDown,
-  BookOpen
+  BookOpen,
+  ArrowRight,
+  MapPin
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -24,9 +27,9 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
+  const navigate = useNavigate();
   const user = state.currentUser!;
   
-  // Calculate specific totals for the 2 categories
   const myReferrals = useMemo(() => 
     state.referrals.filter(r => r.referrerId === user.id),
     [state.referrals, user.id]
@@ -98,9 +101,31 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
       </header>
 
+      {/* Book Selling Discovery Card */}
+      {user.bookSellerStatus === BookSellerStatus.NONE && (
+        <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top-4 duration-500">
+          <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="bg-malawi-red/10 p-5 rounded-3xl text-malawi-red">
+                <BookOpen size={32} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Apply as a Book Seller</h3>
+                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Request verification to sell books and boost your network earnings.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => navigate('/profile?tab=bookselling')}
+              className="px-8 py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+            >
+              Start Selling <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Categories Earnings Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* DIRECT INVITES CARD */}
         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-malawi-green transition-all relative overflow-hidden">
           <div className="flex items-center gap-4 relative z-10">
             <div className="p-3 bg-malawi-green/10 text-malawi-green rounded-2xl group-hover:bg-malawi-green group-hover:text-white transition-all"><TrendingUp size={24}/></div>
@@ -115,7 +140,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
           <TrendingUp className="absolute right-[-5%] bottom-[-10%] text-gray-50 w-24 h-24 rotate-12" />
         </div>
 
-        {/* INDIRECT INVITES CARD */}
         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-malawi-red transition-all relative overflow-hidden">
           <div className="flex items-center gap-4 relative z-10">
             <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl group-hover:bg-malawi-red group-hover:text-white transition-all"><Users size={24}/></div>
