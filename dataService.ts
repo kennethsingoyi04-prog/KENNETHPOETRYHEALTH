@@ -14,8 +14,8 @@ const STORAGE_KEY = 'kph_local_cache';
 const MAX_PAYLOAD_KB = 500; 
 
 /**
- * THE NETLIFY INFINITE-FREE SHIELD
- * This ensures no images over 80KB ever leave the browser.
+ * COMPRESSION GUARD
+ * Shrinks images to ~50KB before they leave the browser to save bandwidth.
  */
 const compressImageLocally = async (file: File): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -28,7 +28,7 @@ const compressImageLocally = async (file: File): Promise<Blob> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_DIM = 800; // Lower resolution for maximum free-tier safety
+        const MAX_DIM = 800; 
 
         if (width > height) {
           if (width > MAX_DIM) {
@@ -47,27 +47,21 @@ const compressImageLocally = async (file: File): Promise<Blob> => {
         ctx?.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
           resolve(blob || file);
-        }, 'image/jpeg', 0.5); // 50% quality is the "Sweet Spot" for Netlify Free Tier
+        }, 'image/jpeg', 0.5); 
       };
     };
   });
 };
 
-/**
- * Saves state to LocalStorage immediately to avoid needing the cloud for every action.
- */
 export const saveToLocal = (state: AppState) => {
   try {
     const { currentUser, ...persistentData } = state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistentData));
   } catch (e) {
-    console.error("LocalStorage full, please use Nuclear Scrub.");
+    console.error("LocalStorage full.");
   }
 };
 
-/**
- * Loads the last known state from LocalStorage.
- */
 export const loadFromLocal = (): Partial<AppState> | null => {
   const data = localStorage.getItem(STORAGE_KEY);
   return data ? JSON.parse(data) : null;
@@ -94,9 +88,8 @@ export const nuclearScrub = (obj: any): any => {
   const scrubbed = Array.isArray(obj) ? [] : {};
   for (const key in obj) {
     const value = obj[key];
-    // Aggressive filtering of anything that looks like a heavy data blob
-    if (typeof value === 'string' && (value.startsWith('data:') || value.length > 250)) {
-      (scrubbed as any)[key] = "[STRIPPED_TO_SAVE_NETLIFY_CREDITS]";
+    if (typeof value === 'string' && (value.startsWith('data:') || value.length > 300)) {
+      (scrubbed as any)[key] = "[STRIPPED_DATA]";
     } else if (typeof value === 'object') {
       (scrubbed as any)[key] = nuclearScrub(value);
     } else {
@@ -124,17 +117,13 @@ export const uploadImage = async (file: File, folder: string): Promise<string | 
   }
 };
 
-/**
- * EXPLICIT CLOUD SYNC ONLY
- * Background syncing is disabled to prevent Netlify "Phantom Billing"
- */
 export const syncAppStateToCloud = async (state: AppState): Promise<boolean> => {
   const { currentUser, ...persistentData } = state;
   const cleanData = nuclearScrub(persistentData);
   const sizeKb = JSON.stringify(cleanData).length / 1024;
 
   if (sizeKb > MAX_PAYLOAD_KB) {
-    throw new Error(`Payload too large (${sizeKb.toFixed(1)}KB). Please use Nuclear Scrub in Admin.`);
+    throw new Error(`Data too large (${sizeKb.toFixed(1)}KB). Clean your database.`);
   }
 
   try {

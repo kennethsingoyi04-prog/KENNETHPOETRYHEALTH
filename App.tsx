@@ -16,7 +16,7 @@ import Navbar from './components/Navbar';
 import Logo from './components/Logo';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
 import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth, saveToLocal, loadFromLocal } from './dataService';
-import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft, ShieldAlert, Clock, Gavel } from 'lucide-react';
 
 const SESSION_KEY = 'kph_session_uid';
 
@@ -59,6 +59,15 @@ const App: React.FC = () => {
           const cloudUsers = cloudData.users || [];
           let sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
           
+          // Auto-Expiry for Temporary Bans
+          if (sessionUser?.isBanned && sessionUser.banType === 'TEMPORARY' && sessionUser.banExpiresAt) {
+             if (new Date() > new Date(sessionUser.banExpiresAt)) {
+                sessionUser.isBanned = false;
+                sessionUser.banType = undefined;
+                sessionUser.banReason = undefined;
+             }
+          }
+
           setState(prev => ({
             ...prev,
             ...cloudData,
@@ -78,7 +87,7 @@ const App: React.FC = () => {
       const success = await syncAppStateToCloud(state);
       if (success) {
         setHasUnsavedChanges(false);
-        alert("Cloud Sync Successful. Your Netlify Credits are safe.");
+        alert("Cloud Backup Complete. Site updated successfully.");
       }
     } catch (e: any) {
       alert(e.message);
@@ -128,26 +137,69 @@ const App: React.FC = () => {
         <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Connecting to Private Network...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Establishing Secure Command...</p>
         </div>
       </div>
     );
   }
 
-  // Banned UI Barrier
+  // DISCIPLINE BARRIER - THE BANNED SCREEN
   if (state.currentUser?.isBanned && state.currentUser.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="w-32 h-32 bg-malawi-red rounded-full flex items-center justify-center mb-10 shadow-2xl animate-bounce">
+        <div className="w-32 h-32 bg-malawi-red rounded-[2.5rem] flex items-center justify-center mb-10 shadow-2xl animate-bounce relative overflow-hidden">
           <Ban size={64} />
+          <div className="absolute top-0 left-0 w-full h-full bg-white/10 animate-pulse"></div>
         </div>
-        <h1 className="text-5xl font-black uppercase tracking-tight mb-6">Access Revoked</h1>
-        <div className="bg-white/5 border border-white/10 p-10 rounded-[3rem] w-full max-w-2xl mb-10 text-left">
-          <p className="text-2xl font-black italic">"{state.currentUser.banReason || 'Platform Policy Violation'}"</p>
+        
+        <h1 className="text-5xl font-black uppercase tracking-tighter mb-4 text-malawi-red">Account Restricted</h1>
+        <p className="text-gray-500 max-w-lg mb-12 font-bold uppercase tracking-widest text-xs">Access to KENNETHPOETRYHEALTH has been revoked by administration.</p>
+        
+        <div className="bg-white/5 border border-white/10 p-12 rounded-[3.5rem] w-full max-w-2xl mb-12 text-left relative overflow-hidden backdrop-blur-md">
+           <div className="absolute top-[-10%] right-[-5%] text-white/5 -rotate-12 pointer-events-none">
+              <Gavel size={160} />
+           </div>
+           
+           <div className="relative z-10 space-y-6">
+              <div className="flex items-center gap-3 text-malawi-red">
+                 <ShieldAlert size={20} />
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em]">Disciplinary Report</span>
+              </div>
+              
+              <div className="space-y-2">
+                 <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Formal Violation Reason:</p>
+                 <p className="text-3xl font-black italic leading-tight">"{state.currentUser.banReason || 'Standard Platform Violation'}"</p>
+              </div>
+
+              {state.currentUser.banType === 'TEMPORARY' && state.currentUser.banExpiresAt && (
+                 <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                       <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Restriction Expiry:</p>
+                       <p className="text-xl font-black text-malawi-green">{new Date(state.currentUser.banExpiresAt).toLocaleDateString()} {new Date(state.currentUser.banExpiresAt).toLocaleTimeString()}</p>
+                    </div>
+                    <div className="bg-malawi-green/10 text-malawi-green px-5 py-2 rounded-full border border-malawi-green/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                       <Clock size={14} /> Auto-Lifting Enabled
+                    </div>
+                 </div>
+              )}
+           </div>
         </div>
-        <button onClick={logout} className="px-10 bg-white/10 hover:bg-white/20 text-white font-black py-6 rounded-3xl uppercase text-xs tracking-widest transition-all">
-          Logout
-        </button>
+
+        <div className="flex flex-col sm:flex-row gap-5 w-full max-w-md">
+           <a 
+             href={`https://wa.me/${state.users.find(u => u.isOwner)?.whatsapp}`} 
+             target="_blank" 
+             className="flex-grow bg-malawi-green hover:bg-green-700 text-white font-black py-6 rounded-[2rem] uppercase text-xs tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all active:scale-95"
+           >
+             <MessageCircle size={20} /> Appeal Access
+           </a>
+           <button 
+             onClick={logout} 
+             className="px-12 bg-white/5 hover:bg-white/10 text-white font-black py-6 rounded-[2rem] border border-white/10 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-2 transition-all"
+           >
+             <ArrowLeft size={16} /> Logout
+           </button>
+        </div>
       </div>
     );
   }
