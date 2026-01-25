@@ -63,24 +63,24 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
           <div className="flex items-center gap-2 mt-1">
             <span className="px-3 py-1 bg-malawi-green text-white rounded-full text-[9px] font-black uppercase tracking-widest">{currentTier?.name || 'FREE MEMBER'}</span>
             <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-gray-400">
-              <RefreshCw size={10} className="animate-spin" /> Live Sync Active
+              <RefreshCw size={10} className="animate-spin" /> Auto-Refresh Active
             </span>
           </div>
         </div>
         <div className="bg-malawi-black text-white px-8 py-5 rounded-[2rem] border-b-4 border-malawi-green shadow-xl relative overflow-hidden group">
-          <p className="text-[10px] uppercase font-black tracking-widest opacity-60">MWK Balance</p>
+          <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Wallet Balance</p>
           <p className="text-3xl font-black">K{user.balance.toLocaleString()}</p>
           <Zap className="absolute top-[-20%] right-[-10%] text-white/5 w-24 h-24 rotate-12" />
         </div>
       </header>
 
-      {/* Commission Display */}
+      {/* Commission Display - UPDATED LABELS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-malawi-green transition-all">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-malawi-green/10 text-malawi-green rounded-2xl group-hover:bg-malawi-green group-hover:text-white transition-all"><TrendingUp size={24}/></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Direct Profit Rate</p>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">DIRECT INVITES EARNINGS</p>
               <p className="text-xl font-black text-malawi-green">{currentTier?.directCommission || 30}% Attached</p>
             </div>
           </div>
@@ -89,7 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
           <div className="flex items-center gap-4">
             <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl group-hover:bg-malawi-red group-hover:text-white transition-all"><Users size={24}/></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Indirect Bonus Rate</p>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">INDIRECT INVITES BONUS EARNINGS</p>
               <p className="text-xl font-black text-malawi-red">{currentTier?.indirectCommission || 5}% Attached</p>
             </div>
           </div>
