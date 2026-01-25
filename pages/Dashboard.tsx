@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, MembershipStatus } from '../types';
+import { AppState, MembershipStatus, BookSellerStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -14,7 +14,8 @@ import {
   TrendingUp,
   CheckCircle,
   RefreshCw,
-  TrendingDown
+  TrendingDown,
+  BookOpen
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -75,7 +76,14 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
     <div className="space-y-6 pb-24 animate-in fade-in duration-700">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-malawi-black uppercase tracking-tight">Moni, {user.fullName}!</h1>
+          <div className="flex items-center gap-3">
+             <h1 className="text-2xl font-black text-malawi-black uppercase tracking-tight">Moni, {user.fullName}!</h1>
+             {user.bookSellerStatus === BookSellerStatus.APPROVED && (
+                <span className="flex items-center gap-1 bg-malawi-red text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-md animate-pulse">
+                  <BookOpen size={10} /> Verified Seller
+                </span>
+             )}
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="px-3 py-1 bg-malawi-green text-white rounded-full text-[9px] font-black uppercase tracking-widest">{currentTier?.name || 'FREE MEMBER'}</span>
             <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-gray-400">

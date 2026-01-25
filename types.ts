@@ -72,8 +72,10 @@ export interface User {
   membershipProofUrl?: string;
   // Book Selling Fields
   bookSellerStatus?: BookSellerStatus;
+  bookSellerFullName?: string;
   bookSellerPhone?: string;
   bookSellerWhatsapp?: string;
+  bookSellerAddress?: string;
 }
 
 export interface WithdrawalRequest {
