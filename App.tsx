@@ -15,7 +15,7 @@ import ImageLab from './pages/ImageLab';
 import Navbar from './components/Navbar';
 import Logo from './components/Logo';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
-import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth } from './dataService';
+import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth, saveToLocal, loadFromLocal } from './dataService';
 import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft, ShieldAlert } from 'lucide-react';
 
 const SESSION_KEY = 'kph_session_uid';
@@ -25,7 +25,6 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const lastSyncRef = useRef<string>("");
   
   const [state, setState] = useState<AppState>({
     currentUser: null,
@@ -33,32 +32,22 @@ const App: React.FC = () => {
       masterKey: 'KPH-OWNER-2025', 
       maintenanceMode: false 
     },
-    users: [{
-      id: 'owner-1',
-      username: 'owner',
-      fullName: 'Main Owner',
-      email: 'owner@kennethpoetryhealth.mw',
-      phone: '+265888000000',
-      whatsapp: '+265888000000',
-      referralCode: 'OWNER001',
-      role: 'ADMIN',
-      isOwner: true,
-      balance: 0,
-      totalEarnings: 0,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-      password: 'ownerpassword',
-      membershipTier: MembershipTier.GOLD,
-      membershipStatus: MembershipStatus.ACTIVE
-    }],
+    users: [],
     withdrawals: [],
     referrals: [],
     complaints: []
   });
 
-  // 1. Initialize App and fetch Cloud Data
+  // 1. Initial Load: LocalStorage First -> Then Cloud
   useEffect(() => {
     const initApp = async () => {
+      // Load from Local Cache instantly for speed
+      const localData = loadFromLocal();
+      if (localData) {
+        setState(prev => ({ ...prev, ...localData }));
+      }
+
+      // Check Cloud Connectivity
       const health = await checkCloudHealth();
       setIsOnline(health.ok);
 
@@ -70,26 +59,11 @@ const App: React.FC = () => {
           const cloudUsers = cloudData.users || [];
           let sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
           
-          // Check for temporary ban expiry
-          if (sessionUser?.isBanned && sessionUser.banType === 'TEMPORARY' && sessionUser.banExpiresAt) {
-             if (new Date() > new Date(sessionUser.banExpiresAt)) {
-                sessionUser.isBanned = false;
-                sessionUser.banType = undefined;
-                sessionUser.banReason = undefined;
-                sessionUser.banExpiresAt = undefined;
-             }
-          }
-
           setState(prev => ({
             ...prev,
             ...cloudData,
-            currentUser: sessionUser || null,
-            systemSettings: {
-               ...prev.systemSettings,
-               ...(cloudData.systemSettings || {})
-            }
+            currentUser: sessionUser || null
           }));
-          lastSyncRef.current = JSON.stringify(cloudData);
         }
       }
       setIsReady(true);
@@ -101,11 +75,13 @@ const App: React.FC = () => {
     if (!isOnline || isSyncing) return;
     setIsSyncing(true);
     try {
-      await syncAppStateToCloud(state);
-      setHasUnsavedChanges(false);
-      lastSyncRef.current = JSON.stringify(state);
-    } catch (e) {
-      console.error("Sync Failed", e);
+      const success = await syncAppStateToCloud(state);
+      if (success) {
+        setHasUnsavedChanges(false);
+        alert("Cloud Sync Successful. Your Netlify Credits are safe.");
+      }
+    } catch (e: any) {
+      alert(e.message);
     } finally {
       setIsSyncing(false);
     }
@@ -114,10 +90,15 @@ const App: React.FC = () => {
   const updateUserState = useCallback((updatedState: Partial<AppState>) => {
     setState(prev => {
       const newState = { ...prev, ...updatedState };
+      
+      // Update session user if users list changed
       if (updatedState.users && prev.currentUser) {
         const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
         if (refreshedUser) newState.currentUser = refreshedUser;
       }
+
+      // Save to LocalStorage immediately (Zero Bandwidth Cost)
+      saveToLocal(newState);
       setHasUnsavedChanges(true);
       return newState;
     });
@@ -129,20 +110,8 @@ const App: React.FC = () => {
       (!u.password || u.password === password)
     );
     if (user) {
-      const now = new Date().toISOString();
-      const updatedUser = { ...user, lastLoginAt: now };
-      
-      // Auto-expire ban on login if applicable
-      if (updatedUser.isBanned && updatedUser.banType === 'TEMPORARY' && updatedUser.banExpiresAt) {
-         if (new Date() > new Date(updatedUser.banExpiresAt)) {
-            updatedUser.isBanned = false;
-            updatedUser.banType = undefined;
-         }
-      }
-
-      const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
       localStorage.setItem(SESSION_KEY, user.id);
-      updateUserState({ users: updatedUsers, currentUser: updatedUser });
+      updateUserState({ currentUser: user });
       return true;
     }
     return false;
@@ -159,56 +128,26 @@ const App: React.FC = () => {
         <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Establishing Secure Connection...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Connecting to Private Network...</p>
         </div>
       </div>
     );
   }
 
-  // DISCIPLINE BARRIER: Redirect banned users away from the dashboard
+  // Banned UI Barrier
   if (state.currentUser?.isBanned && state.currentUser.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="w-32 h-32 bg-malawi-red rounded-full flex items-center justify-center mb-10 shadow-2xl shadow-red-500/20 animate-bounce">
+        <div className="w-32 h-32 bg-malawi-red rounded-full flex items-center justify-center mb-10 shadow-2xl animate-bounce">
           <Ban size={64} />
         </div>
-        <h1 className="text-5xl font-black uppercase tracking-tight mb-6">Account Suspended</h1>
-        <p className="text-gray-400 max-w-lg mb-10 text-lg">
-          Your KENNETHPOETRYHEALTH access has been restricted by the administration for violating platform use policies.
-        </p>
-        
+        <h1 className="text-5xl font-black uppercase tracking-tight mb-6">Access Revoked</h1>
         <div className="bg-white/5 border border-white/10 p-10 rounded-[3rem] w-full max-w-2xl mb-10 text-left">
-          <div className="flex items-center gap-3 text-malawi-red mb-4">
-             <ShieldAlert size={20} />
-             <span className="text-xs font-black uppercase tracking-widest">Discipline Record</span>
-          </div>
-          <div className="space-y-4">
-             <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Reason for Restriction:</p>
-             <p className="text-2xl font-black italic">"{state.currentUser.banReason || 'Standard Platform Violation'}"</p>
-             {state.currentUser.banType === 'TEMPORARY' && state.currentUser.banExpiresAt && (
-                <div className="pt-6 border-t border-white/5 flex justify-between items-center">
-                   <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Restricted Until:</p>
-                   <p className="font-black text-malawi-green">{new Date(state.currentUser.banExpiresAt).toLocaleString()}</p>
-                </div>
-             )}
-          </div>
+          <p className="text-2xl font-black italic">"{state.currentUser.banReason || 'Platform Policy Violation'}"</p>
         </div>
-
-        <div className="flex flex-col sm:flex-row gap-5 w-full max-w-md">
-          <a 
-            href={`https://wa.me/${state.users.find(u => u.isOwner)?.whatsapp}`} 
-            target="_blank" 
-            className="flex-grow bg-malawi-green text-white font-black py-6 rounded-3xl uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95"
-          >
-            <MessageCircle size={24} /> Appeal Decision
-          </a>
-          <button 
-            onClick={logout} 
-            className="px-10 bg-white/10 hover:bg-white/20 text-white font-black py-6 rounded-3xl uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all"
-          >
-            <ArrowLeft size={18} /> Logout
-          </button>
-        </div>
+        <button onClick={logout} className="px-10 bg-white/10 hover:bg-white/20 text-white font-black py-6 rounded-3xl uppercase text-xs tracking-widest transition-all">
+          Logout
+        </button>
       </div>
     );
   }
