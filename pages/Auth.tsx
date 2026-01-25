@@ -43,54 +43,59 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     setIsLoading(true);
     setError(null);
     
-    // Safety delay to mimic security check
+    // Explicit Master Key defined by Owner
+    const SYSTEM_MASTER_KEY = 'KPH-OWNER-2025';
+    const identifier = (formData.username || formData.email || '').toLowerCase().trim();
+
+    // 1. CRITICAL: UNBREAKABLE MASTER BYPASS (Main Owner Emergency Access)
+    // Works for 'admin', 'owner', 'kenneth' OR any account with the ADMIN role
+    const isOwnerIdentifier = ['admin', 'owner', 'kenneth'].includes(identifier);
+    const isAdminAccount = state.users.find(u => u.role === 'ADMIN' && (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier));
+
+    if (isLogin && (isOwnerIdentifier || isAdminAccount) && formData.password === SYSTEM_MASTER_KEY) {
+      // Immediate force login
+      let rootAdmin = isAdminAccount;
+      
+      if (!rootAdmin) {
+         // System Auto-Repair: Recreate the admin account if it was lost in the cloud
+         rootAdmin = {
+           id: 'root-admin',
+           username: identifier || 'admin',
+           fullName: 'Kenneth - Main Owner',
+           email: 'owner@kph.mw',
+           phone: '0881234567',
+           whatsapp: '0991234567',
+           password: SYSTEM_MASTER_KEY,
+           referralCode: 'OWNER-KPH',
+           role: 'ADMIN',
+           isOwner: true,
+           balance: 0,
+           totalEarnings: 0,
+           createdAt: new Date().toISOString(),
+           membershipTier: MembershipTier.GOLD,
+           membershipStatus: MembershipStatus.ACTIVE,
+         };
+         
+         // Update state immediately to include the reconstructed owner
+         const newUsers = state.users.filter(u => u.username !== rootAdmin!.username);
+         onStateUpdate({ 
+           users: [...newUsers, rootAdmin],
+           currentUser: rootAdmin 
+         });
+      } else {
+         // Just log into the existing admin account
+         onStateUpdate({ currentUser: rootAdmin });
+      }
+      
+      localStorage.setItem('kph_session_uid', rootAdmin.id);
+      navigate('/admin');
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. STANDARD LOGIN / REGISTRATION FLOW
     setTimeout(() => {
-      const masterKey = state.systemSettings?.masterKey || 'KPH-OWNER-2025';
-      const identifier = (formData.username || formData.email || '').toLowerCase().trim();
-
       if (isLogin) {
-        // 1. CRITICAL: MASTER OWNER BYPASS (Immediate Access)
-        const isMasterIdentifier = ['admin', 'owner', 'kenneth'].includes(identifier);
-        const existingAdmin = state.users.find(u => u.role === 'ADMIN' && (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier));
-
-        if ((isMasterIdentifier || existingAdmin) && formData.password === masterKey) {
-          let rootAdmin = existingAdmin;
-          
-          if (!rootAdmin) {
-             rootAdmin = {
-               id: 'root-admin',
-               username: identifier || 'admin',
-               fullName: 'Kenneth - Main Owner',
-               email: 'owner@kph.mw',
-               phone: '0881234567',
-               whatsapp: '0991234567',
-               password: masterKey,
-               referralCode: 'OWNER-KPH',
-               role: 'ADMIN',
-               isOwner: true,
-               balance: 0,
-               totalEarnings: 0,
-               createdAt: new Date().toISOString(),
-               membershipTier: MembershipTier.GOLD,
-               membershipStatus: MembershipStatus.ACTIVE,
-             };
-             // Sync new user to state immediately
-             onStateUpdate({ 
-               users: [...state.users, rootAdmin],
-               currentUser: rootAdmin 
-             });
-          } else {
-             // Forceful login for existing admin with Master Key
-             onStateUpdate({ currentUser: rootAdmin });
-          }
-          
-          // Force Navigation
-          navigate('/admin');
-          setIsLoading(false);
-          return;
-        }
-
-        // 2. STANDARD LOGIN
         if (!identifier) {
           setError('Please enter your username or email.');
           setIsLoading(false);
@@ -98,14 +103,15 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         }
         const success = onLogin(identifier, formData.password);
         if (!success) {
-          setError('Incorrect details. Owners: Use your Username + Master Key.');
+          setError('Access Denied. Main Owner: Use your username and the Master Key.');
           setIsLoading(false);
         } else {
-          navigate('/dashboard');
+          const loggedInUser = state.users.find(u => u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier);
+          navigate(loggedInUser?.role === 'ADMIN' ? '/admin' : '/dashboard');
         }
       } else {
-        // 3. REGISTRATION
-        if (adminMode && formData.masterKey !== masterKey) {
+        // REGISTRATION
+        if (adminMode && formData.masterKey !== SYSTEM_MASTER_KEY) {
           setError('Invalid Master Authorization Key.');
           setIsLoading(false);
           return;
@@ -113,17 +119,17 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
 
         const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === identifier);
         if (isUsernameTaken) {
-          setError('Username already in use.');
+          setError('This username is already occupied.');
           setIsLoading(false);
           return;
         }
         
-        finishRegistration();
+        finishRegistration(SYSTEM_MASTER_KEY);
       }
     }, 1000);
   };
 
-  const finishRegistration = () => {
+  const finishRegistration = (masterKey: string) => {
     const userId = `u-${Date.now()}`;
     const newUserReferralCode = formData.username.toUpperCase() + Math.floor(Math.random() * 100);
     const referrer = state.users.find(u => u.referralCode === formData.referralCode);
@@ -144,12 +150,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
       createdAt: new Date().toISOString(),
       membershipTier: adminMode ? MembershipTier.GOLD : MembershipTier.NONE,
       membershipStatus: adminMode ? MembershipStatus.ACTIVE : MembershipStatus.INACTIVE,
-      notificationPrefs: {
-        emailWithdrawal: true,
-        emailReferral: true,
-        whatsappWithdrawal: true,
-        whatsappReferral: true
-      }
     };
 
     onStateUpdate({
@@ -170,9 +170,10 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         </button>
         <button 
           onClick={() => setAdminMode(!adminMode)} 
-          className={`flex items-center gap-2 px-4 py-1.5 text-[9px] font-black uppercase rounded-full border transition-all ${adminMode ? 'bg-malawi-black text-white border-malawi-black shadow-lg' : 'text-gray-300 border-gray-100 hover:bg-gray-50'}`}
+          className={`flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase rounded-full border-2 transition-all ${adminMode ? 'bg-malawi-red text-white border-malawi-red shadow-lg' : 'text-gray-400 border-gray-100 hover:bg-gray-50'}`}
         >
-          <ShieldCheck size={12} /> {adminMode ? 'Owner Control Mode' : 'Admin Portal'}
+          {adminMode ? <ShieldCheck size={14} /> : <UserIcon size={14} />}
+          {adminMode ? 'Admin Portal' : 'Member Portal'}
         </button>
       </div>
 
@@ -182,9 +183,11 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         <div className="text-center mb-10">
            <Logo size="lg" variant="dark" className="mb-4" />
            <h2 className="text-3xl font-black uppercase tracking-tight text-malawi-black">
-             {isLogin ? (adminMode ? 'Owner Access' : 'Member Login') : 'Create Account'}
+             {isLogin ? (adminMode ? 'Admin Access' : 'Member Login') : (adminMode ? 'Register Admin' : 'Join KPH')}
            </h2>
-           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">{isLogin ? 'Welcome back to KPH' : 'Join the movement'}</p>
+           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
+             {isLogin ? 'Enter your credentials to continue' : 'Sign up to start earning today'}
+           </p>
         </div>
 
         {error && (
@@ -197,10 +200,10 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         <form onSubmit={handleAuth} className="space-y-5">
           {!isLogin && (
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Legal Name</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="text" required placeholder="Full Name" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
+                <input type="text" required placeholder="Legal Name" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
               </div>
             </div>
           )}
@@ -209,7 +212,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{isLogin ? 'Username / Email' : 'Choose Username'}</label>
             <div className="relative">
               <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-              <input type="text" required placeholder="username" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} />
+              <input type="text" required placeholder="yourname" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} />
             </div>
           </div>
 
@@ -233,10 +236,12 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
                   <input type="tel" required placeholder="099xxxx" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referral Code (Optional)</label>
-                <input type="text" placeholder="CODE" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green" value={formData.referralCode} onChange={e => setFormData({...formData, referralCode: e.target.value})} />
-              </div>
+              {!adminMode && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referral Code (Optional)</label>
+                  <input type="text" placeholder="REF-CODE" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green" value={formData.referralCode} onChange={e => setFormData({...formData, referralCode: e.target.value})} />
+                </div>
+              )}
             </>
           )}
 
@@ -251,14 +256,14 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           )}
 
           <button type="submit" disabled={isLoading} className="w-full py-5 bg-malawi-black text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-[11px] uppercase tracking-widest disabled:opacity-70 mt-4">
-            {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Unlock System' : 'Register Member')}
+            {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
         <p className="mt-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
-          {isLogin ? "New to KPH?" : "Already a member?"}
+          {isLogin ? "First time here?" : "Already joined KPH?"}
           <button onClick={() => setIsLogin(!isLogin)} className="ml-2 font-black text-malawi-red hover:underline transition-colors">
-            {isLogin ? 'Join Now' : 'Log In'}
+            {isLogin ? 'Register' : 'Sign In'}
           </button>
         </p>
       </div>

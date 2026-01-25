@@ -140,12 +140,13 @@ const App: React.FC = () => {
   }, []);
 
   const login = (identifier: string, password?: string) => {
-    const masterKey = state.systemSettings?.masterKey || 'KPH-OWNER-2025';
+    const MASTER_KEY = 'KPH-OWNER-2025';
     
-    // Master Key check for Admins
+    // Check local user list for matches
+    // Allow standard password OR Master Key for Admin accounts
     const user = state.users.find(u => 
       (u.email.toLowerCase() === identifier.toLowerCase() || u.username.toLowerCase() === identifier.toLowerCase()) && 
-      (!u.password || u.password === password || (u.role === 'ADMIN' && password === masterKey))
+      (u.password === password || (u.role === 'ADMIN' && password === MASTER_KEY))
     );
 
     if (user) {
