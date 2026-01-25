@@ -24,7 +24,6 @@ import {
   Phone,
   CheckCircle,
   X,
-  // Added Zap icon to resolve the reported error
   Zap
 } from 'lucide-react';
 
@@ -64,7 +63,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
     e.preventDefault();
     if (!aiPrompt.trim()) return;
     
-    // Removed explicit API_KEY check and error message to comply with guidelines
     setIsAskingAI(true);
     setAiResponse(null);
     
@@ -234,7 +232,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                 <span>Grow Your Network</span>
               </div>
               <h2 className="text-3xl font-bold leading-tight max-w-md">
-                Invite friends and earn up to <span className="text-malawi-green">15% combined</span> commission!
+                Invite friends and earn recurring commissions on every direct and indirect referral!
               </h2>
               <div className="flex flex-col sm:flex-row items-center gap-2 pt-4">
                 <div className="bg-gray-900 border border-gray-700 p-4 rounded-xl flex-grow font-mono text-sm w-full truncate text-gray-400">
@@ -255,13 +253,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                 <Sparkles className="text-malawi-green" size={20} />
                 <h3 className="font-black text-lg text-malawi-black uppercase tracking-tight">AI Marketing Brainstormer</h3>
               </div>
-              {/* Removed prohibited API key status badge */}
             </div>
             <div className="p-6 space-y-4">
               {!aiResponse ? (
                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 text-center">
                    <p className="text-sm text-gray-500 mb-4">Need help finding new affiliates in Malawi? Ask our AI for a local strategy!</p>
-                   {/* Removed prohibited API key missing alert */}
                    <div className="flex flex-wrap gap-2 justify-center">
                       {["How to use WhatsApp Status?", "Pitch for Blantyre markets", "How to explain commissions?"].map(hint => (
                         <button key={hint} onClick={() => setAiPrompt(hint)} className="text-[10px] font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:border-malawi-green hover:text-malawi-green transition-all">{hint}</button>

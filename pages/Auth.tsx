@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AppState, User, Referral, MembershipTier, MembershipStatus } from '../types';
-import { LEVEL_1_COMMISSION_PERCENT, LEVEL_2_COMMISSION_PERCENT, SIGNUP_BONUS } from '../constants';
+import { MEMBERSHIP_TIERS, SIGNUP_BONUS } from '../constants';
 import Logo from '../components/Logo';
 import { Lock, User as UserIcon, Phone, Smartphone, ChevronRight, AtSign, ArrowLeft, Loader2, AlertCircle, ShieldCheck, Key } from 'lucide-react';
 import { notifyNewRegistration } from '../services/NotificationService';
@@ -108,7 +108,12 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
 
     // Referral logic (only for regular users)
     if (!isAdminMode && referrer) {
-      const l1Commission = (SIGNUP_BONUS * LEVEL_1_COMMISSION_PERCENT) / 100;
+      // Find Referrer Tier config
+      const referrerTier = MEMBERSHIP_TIERS.find(t => t.tier === referrer.membershipTier) || MEMBERSHIP_TIERS[0];
+      
+      const l1Percent = referrerTier.directCommission;
+      const l1Commission = (SIGNUP_BONUS * l1Percent) / 100;
+      
       const l1Referral: Referral = {
         id: `r-${Date.now()}-1`,
         referrerId: referrer.id,
@@ -128,7 +133,10 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
       if (referrer.referredBy) {
         const l2Referrer = state.users.find(u => u.id === referrer.referredBy);
         if (l2Referrer) {
-          const l2Commission = (SIGNUP_BONUS * LEVEL_2_COMMISSION_PERCENT) / 100;
+          const l2Tier = MEMBERSHIP_TIERS.find(t => t.tier === l2Referrer.membershipTier) || MEMBERSHIP_TIERS[0];
+          const l2Percent = l2Tier.indirectCommission;
+          const l2Commission = (SIGNUP_BONUS * l2Percent) / 100;
+          
           const l2Referral: Referral = {
             id: `r-${Date.now()}-2`,
             referrerId: l2Referrer.id,

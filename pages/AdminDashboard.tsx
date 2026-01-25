@@ -3,7 +3,6 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, WithdrawalStatus, MembershipStatus, User, WithdrawalRequest, MembershipTier, BookSellerStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { checkCloudHealth, syncAppStateToCloud, uploadImage, nuclearScrub, fetchAppStateFromCloud } from '../dataService';
-// Added missing Smartphone and Clock imports to fix reference errors
 import { 
   ShieldCheck, RefreshCw, Search, 
   X, Wallet, Users, Zap, Award,
@@ -12,7 +11,7 @@ import {
   Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
   Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode, Settings2,
   BookOpen, Eye, User as UserIcon, Mail, Phone, Hash, Calendar, DollarSign,
-  UserCheck, Smartphone, Clock
+  UserCheck, Smartphone, Clock, ListChecks, ArrowRight
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -158,11 +157,11 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
     return state.users.filter(u => u.bookSellerStatus === BookSellerStatus.PENDING);
   }, [state.users]);
 
-  const getUserReferrals = (userId: string) => {
-    const l1Count = state.users.filter(u => u.referredBy === userId).length;
-    const l1Ids = state.users.filter(u => u.referredBy === userId).map(u => u.id);
-    const l2Count = state.users.filter(u => l1Ids.includes(u.referredBy || '')).length;
-    return { l1Count, l2Count };
+  const getUserReferralNetwork = (userId: string) => {
+    const l1 = state.users.filter(u => u.referredBy === userId);
+    const l1Ids = l1.map(u => u.id);
+    const l2 = state.users.filter(u => l1Ids.includes(u.referredBy || ''));
+    return { l1, l2, l1Count: l1.length, l2Count: l2.length };
   };
 
   return (
@@ -178,7 +177,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
       {/* User Inspector Overlay */}
       {inspectingUser && (
         <div className="fixed inset-0 z-[190] flex items-center justify-center p-4 bg-malawi-black/80 backdrop-blur-xl animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 max-h-[90vh] flex flex-col">
+           <div className="bg-white w-full max-w-5xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 max-h-[95vh] flex flex-col">
               <div className="bg-malawi-black p-12 text-white flex items-center justify-between relative overflow-hidden">
                  <div className="relative z-10 flex items-center gap-6">
                     <div className="w-24 h-24 bg-white/10 rounded-[2.5rem] flex items-center justify-center border-4 border-white/10 text-4xl font-black">
@@ -196,7 +195,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                  <div className="absolute top-[-50%] right-[-10%] w-96 h-96 bg-malawi-red/20 rounded-full blur-3xl"></div>
               </div>
 
-              <div className="flex-grow overflow-y-auto p-12">
+              <div className="flex-grow overflow-y-auto p-12 space-y-12">
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Financial Card */}
                     <div className="bg-gray-50 p-8 rounded-[3rem] border border-gray-100 space-y-6">
@@ -223,11 +222,11 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                        <div className="grid grid-cols-2 gap-4">
                           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                              <p className="text-[9px] font-bold text-gray-400 uppercase">L1 Direct</p>
-                             <p className="text-2xl font-black">{getUserReferrals(inspectingUser.id).l1Count}</p>
+                             <p className="text-2xl font-black">{getUserReferralNetwork(inspectingUser.id).l1Count}</p>
                           </div>
                           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                              <p className="text-[9px] font-bold text-gray-400 uppercase">L2 Indirect</p>
-                             <p className="text-2xl font-black">{getUserReferrals(inspectingUser.id).l2Count}</p>
+                             <p className="text-2xl font-black">{getUserReferralNetwork(inspectingUser.id).l2Count}</p>
                           </div>
                        </div>
                        <div className="pt-2">
@@ -258,7 +257,65 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                     </div>
                  </div>
 
-                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                 {/* Referrals List Section */}
+                 <div className="space-y-6">
+                    <div className="flex items-center gap-3 border-b pb-4">
+                       <ListChecks className="text-malawi-black" size={24} />
+                       <h4 className="text-xl font-black uppercase tracking-tight">Full Referral Network</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                             <p className="text-[10px] font-black uppercase tracking-widest text-malawi-green">Level 1 (Direct Invitations)</p>
+                             <span className="bg-malawi-green/10 text-malawi-green px-3 py-1 rounded-full text-[10px] font-black">{getUserReferralNetwork(inspectingUser.id).l1Count} People</span>
+                          </div>
+                          <div className="bg-white border rounded-[2rem] overflow-hidden">
+                             {getUserReferralNetwork(inspectingUser.id).l1.length > 0 ? (
+                                <div className="divide-y max-h-[300px] overflow-y-auto">
+                                   {getUserReferralNetwork(inspectingUser.id).l1.map(ref => (
+                                      <div key={ref.id} className="p-5 flex items-center justify-between hover:bg-gray-50">
+                                         <div>
+                                            <p className="text-sm font-black text-gray-900">{ref.fullName}</p>
+                                            <p className="text-[10px] text-gray-400 uppercase font-bold">@{ref.username}</p>
+                                         </div>
+                                         <ArrowRight size={14} className="text-gray-300" />
+                                      </div>
+                                   ))}
+                                </div>
+                             ) : (
+                                <div className="p-10 text-center text-gray-300 text-xs font-bold uppercase italic">No direct referrals</div>
+                             )}
+                          </div>
+                       </div>
+
+                       <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                             <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Level 2 (Indirect Network)</p>
+                             <span className="bg-blue-600/10 text-blue-600 px-3 py-1 rounded-full text-[10px] font-black">{getUserReferralNetwork(inspectingUser.id).l2Count} People</span>
+                          </div>
+                          <div className="bg-white border rounded-[2rem] overflow-hidden">
+                             {getUserReferralNetwork(inspectingUser.id).l2.length > 0 ? (
+                                <div className="divide-y max-h-[300px] overflow-y-auto">
+                                   {getUserReferralNetwork(inspectingUser.id).l2.map(ref => (
+                                      <div key={ref.id} className="p-5 flex items-center justify-between hover:bg-gray-50">
+                                         <div>
+                                            <p className="text-sm font-black text-gray-900">{ref.fullName}</p>
+                                            <p className="text-[10px] text-gray-400 uppercase font-bold">@{ref.username}</p>
+                                         </div>
+                                         <ArrowRight size={14} className="text-gray-300" />
+                                      </div>
+                                   ))}
+                                </div>
+                             ) : (
+                                <div className="p-10 text-center text-gray-300 text-xs font-bold uppercase italic">No indirect referrals</div>
+                             )}
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-malawi-green/5 p-8 rounded-[3rem] border border-malawi-green/10 flex items-center justify-between">
                        <div>
                           <p className="text-[10px] font-black uppercase text-malawi-green tracking-widest">Membership Status</p>

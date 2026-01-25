@@ -18,7 +18,8 @@ export interface MembershipConfig {
   price: number;
   color: string;
   description: string;
-  directCommission: number; // New field for tier-based earnings
+  directCommission: number; // L1 %
+  indirectCommission: number; // L2 %
 }
 
 export const MEMBERSHIP_TIERS: MembershipConfig[] = [
@@ -28,7 +29,8 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     price: 2000,
     color: '#cd7f32',
     description: 'Entry level membership with basic referral access.',
-    directCommission: 30
+    directCommission: 30,
+    indirectCommission: 5
   },
   {
     tier: MembershipTier.PLATINUM,
@@ -36,7 +38,8 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     price: 5000,
     color: '#e5e4e2',
     description: 'Enhanced tier for consistent affiliates.',
-    directCommission: 32
+    directCommission: 32,
+    indirectCommission: 5
   },
   {
     tier: MembershipTier.SILVER,
@@ -44,7 +47,8 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     price: 10000,
     color: '#c0c0c0',
     description: 'Professional tier with priority support.',
-    directCommission: 34
+    directCommission: 34,
+    indirectCommission: 5
   },
   {
     tier: MembershipTier.COPPER,
@@ -52,7 +56,8 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     price: 15000,
     color: '#b87333',
     description: 'Exclusive tier with higher earning potential.',
-    directCommission: 36
+    directCommission: 36,
+    indirectCommission: 5
   },
   {
     tier: MembershipTier.ALUMINIUM,
@@ -60,7 +65,8 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     price: 20000,
     color: '#d1d1d1',
     description: 'Premium tier for network leaders.',
-    directCommission: 38
+    directCommission: 38,
+    indirectCommission: 5
   },
   {
     tier: MembershipTier.GOLD,
@@ -68,6 +74,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     price: 25000,
     color: '#ffd700',
     description: 'Elite membership with maximum platform benefits.',
-    directCommission: 40
+    directCommission: 40,
+    indirectCommission: 5
   }
 ];
