@@ -4,16 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import { 
   ChevronRight, 
-  Users, 
   Wallet, 
   Zap, 
   ShieldCheck, 
-  Smartphone, 
   TrendingUp, 
-  CheckCircle, 
-  MessageCircle,
-  Award,
-  ArrowRight
+  CheckCircle
 } from 'lucide-react';
 import { MEMBERSHIP_TIERS } from '../constants';
 
@@ -24,7 +19,6 @@ const Landing: React.FC = () => {
     <div className="min-h-screen -mt-6 -mx-4 font-sans text-malawi-black selection:bg-malawi-green selection:text-white bg-white">
       {/* Dynamic Hero Section */}
       <section className="bg-malawi-black text-white pt-24 pb-32 px-6 relative overflow-hidden border-b-8 border-malawi-red">
-        {/* Background Accents */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-malawi-green/10 rounded-full blur-[120px]"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-malawi-red/10 rounded-full blur-[120px]"></div>
@@ -137,17 +131,22 @@ const Landing: React.FC = () => {
       <section className="py-24 px-6 bg-gray-50 border-y border-gray-200">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-black uppercase tracking-tight">Flexible Membership</h2>
-            <p className="text-gray-500 mt-4 font-medium">Unlock your potential. Choose a tier that fits your ambition.</p>
+            <h2 className="text-4xl font-black uppercase tracking-tight text-malawi-black">Select Your Membership</h2>
+            <p className="text-gray-500 mt-4 font-medium italic">Earning potential increases with every tier.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {MEMBERSHIP_TIERS.map(tier => (
-              <div key={tier.tier} className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-2xl transition-all group flex flex-col h-full">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-4" style={{ color: tier.color }}>{tier.name} ACCESS</p>
-                <h4 className="text-4xl font-black mb-4 text-malawi-black">MWK {tier.price.toLocaleString()}</h4>
+              <div key={tier.tier} className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-2xl transition-all group flex flex-col h-full relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 opacity-5" style={{ backgroundColor: tier.color }}></div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: tier.color }}>{tier.name} LEVEL</p>
+                <h4 className="text-4xl font-black mb-1 text-malawi-black">K{tier.price.toLocaleString()}</h4>
+                <div className="flex items-center gap-2 mb-6">
+                  <span className="bg-malawi-green text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{tier.directCommission}% Direct</span>
+                  <span className="bg-malawi-red text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{tier.indirectCommission}% Indirect</span>
+                </div>
                 <p className="text-sm text-gray-500 mb-8 flex-grow leading-relaxed">{tier.description}</p>
                 <div className="flex items-center gap-3 text-malawi-green font-black text-[10px] uppercase tracking-widest pt-6 border-t border-gray-50">
-                  <CheckCircle size={18} /> Lifetime Platform Access
+                  <CheckCircle size={18} /> High-Yield Profits
                 </div>
               </div>
             ))}
@@ -167,24 +166,7 @@ const Landing: React.FC = () => {
               Create Free Account
            </button>
         </div>
-        <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none">
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white rounded-full"></div>
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white rounded-full"></div>
-        </div>
       </section>
-
-      {/* Footer Section */}
-      <footer className="bg-malawi-black text-white py-16 border-t-8 border-malawi-green">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
-          <Logo size="md" variant="light" className="mb-8" />
-          <div className="flex gap-8 mb-10 text-gray-500 font-black uppercase text-[10px] tracking-widest">
-             <span className="hover:text-white cursor-pointer">Terms</span>
-             <span className="hover:text-white cursor-pointer">Privacy</span>
-             <span className="hover:text-white cursor-pointer">Support</span>
-          </div>
-          <p className="text-gray-600 text-xs font-bold">© {new Date().getFullYear()} KENNETHPOETRYHEALTH Malawi. All rights reserved.</p>
-        </div>
-      </footer>
     </div>
   );
 };
