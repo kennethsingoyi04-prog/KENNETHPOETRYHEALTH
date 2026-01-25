@@ -9,7 +9,7 @@ import {
   ImageIcon, CheckCircle2, 
   MessageSquareWarning, Maximize2, Loader2, Database, Trash2,
   Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
-  Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode
+  Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode, Settings2
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -25,6 +25,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [payloadSize, setPayloadSize] = useState<number>(0);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
+  const [showTechnicalSetup, setShowTechnicalSetup] = useState(false);
   
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
   const [payoutNote, setPayoutNote] = useState<{ [key: string]: string }>({});
@@ -229,96 +230,111 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
         )}
 
         {tab === 'settings' && (
-          <div className="p-10 lg:p-16 space-y-12">
+          <div className="p-10 lg:p-16 space-y-12 animate-in fade-in duration-500">
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                <div className="lg:col-span-8 space-y-8">
-                   <div className="bg-malawi-green text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                <div className="lg:col-span-7 space-y-8">
+                   <div className="bg-malawi-green text-white p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
                       <div className="relative z-10">
-                         <div className="flex items-center gap-4 mb-8">
-                            <Rocket size={40} />
-                            <h2 className="text-3xl font-black uppercase tracking-tight">Cloud Sync Status</h2>
+                         <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-4">
+                               <Rocket size={40} />
+                               <h2 className="text-3xl font-black uppercase tracking-tight">System Status</h2>
+                            </div>
+                            {connStatus === 'SUCCESS' && (
+                              <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full border border-white/20">
+                                 <CheckCircle2 size={16} />
+                                 <span className="text-[10px] font-black uppercase">Active</span>
+                              </div>
+                            )}
                          </div>
                          <p className="text-sm font-bold opacity-80 uppercase leading-relaxed mb-6">
-                           Your database is currently optimized for Supabase Free Tier (500MB). We have blocked heavy data transfers to ensure you never pay a cent for bandwidth or storage.
+                           Your platform is currently running on the Supabase Free Tier. We have optimized all data transfers to ensure your hosting remains 100% free of charge.
                          </p>
-                         <div className="flex gap-4">
-                            <div className="bg-white/20 p-4 rounded-2xl">
-                               <p className="text-[10px] font-black uppercase">Database Usage</p>
-                               <p className="text-2xl font-black">{payloadSize.toFixed(1)} KB / 500 MB</p>
-                               <div className="w-full bg-white/20 h-1 rounded-full mt-2 overflow-hidden">
-                                  <div className="bg-white h-full" style={{ width: `${(payloadSize / 512000) * 100}%` }}></div>
+                         <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white/20 p-5 rounded-3xl border border-white/10">
+                               <p className="text-[10px] font-black uppercase opacity-60">Database Size</p>
+                               <p className="text-2xl font-black">{payloadSize.toFixed(1)} KB</p>
+                               <div className="w-full bg-white/20 h-1 rounded-full mt-3 overflow-hidden">
+                                  <div className="bg-white h-full" style={{ width: `${Math.min((payloadSize / 512) * 100, 100)}%` }}></div>
                                </div>
                             </div>
-                            <div className="bg-white/20 p-4 rounded-2xl">
-                               <p className="text-[10px] font-black uppercase">Handshake</p>
-                               <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'CONNECTED' : connStatus === 'TESTING' ? 'TESTING...' : 'DISCONNECTED'}</p>
+                            <div className="bg-white/20 p-5 rounded-3xl border border-white/10">
+                               <p className="text-[10px] font-black uppercase opacity-60">Connection</p>
+                               <p className="text-2xl font-black">{connStatus === 'SUCCESS' ? 'HEALTHY' : 'TESTING...'}</p>
                             </div>
                          </div>
                       </div>
+                      <div className="absolute bottom-[-10%] right-[-5%] w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
                    </div>
 
-                   <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                      <div className="flex items-center justify-between mb-8">
-                         <h3 className="text-xl font-black uppercase flex items-center gap-2"><Terminal size={20} /> 1. Database Setup (Supabase)</h3>
-                         <button onClick={handleCopySql} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
-                            {copiedSql ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
-                            {copiedSql ? 'Copied!' : 'Copy SQL'}
-                         </button>
-                      </div>
-                      <div className="bg-malawi-black p-6 rounded-2xl overflow-x-auto">
-                        <pre className="text-[10px] font-mono text-malawi-green leading-relaxed">
-                          {SUPABASE_SQL}
-                        </pre>
-                      </div>
-                      <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-3 text-blue-800">
-                        <Info size={18} className="shrink-0" />
-                        <p className="text-[10px] font-bold uppercase leading-relaxed">
-                           Paste this code into the "SQL Editor" on Supabase.com and click "Run". This creates your database tables for free.
-                        </p>
-                      </div>
-                   </div>
+                   {showTechnicalSetup && (
+                     <div className="space-y-8 animate-in slide-in-from-top-4 duration-500">
+                        <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
+                           <div className="flex items-center justify-between mb-8">
+                              <h3 className="text-xl font-black uppercase flex items-center gap-2"><Terminal size={20} /> SQL Editor Block</h3>
+                              <button onClick={handleCopySql} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
+                                 {copiedSql ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
+                                 Copy SQL
+                              </button>
+                           </div>
+                           <div className="bg-malawi-black p-6 rounded-2xl overflow-x-auto">
+                             <pre className="text-[10px] font-mono text-malawi-green leading-relaxed">{SUPABASE_SQL}</pre>
+                           </div>
+                        </div>
 
-                   <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                      <div className="flex items-center justify-between mb-8">
-                         <h3 className="text-xl font-black uppercase flex items-center gap-2"><Key size={20} /> 2. Connection Setup (Netlify)</h3>
-                         <button onClick={handleCopyEnv} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
-                            {copiedEnv ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
-                            {copiedEnv ? 'Copied!' : 'Copy Env Block'}
-                         </button>
-                      </div>
-                      <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                           <p className="text-xs font-black text-malawi-black uppercase mb-4 flex items-center gap-2"><FileCode size={16} /> Netlify Env Format</p>
-                           <p className="text-[10px] font-bold text-gray-400 uppercase mb-4 leading-relaxed">
-                             In the Netlify "Contents of .env file" box, paste this block and fill in your Supabase keys:
-                           </p>
-                           <div className="bg-malawi-black p-4 rounded-xl font-mono text-[10px] text-malawi-green space-y-2 relative group">
+                        <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
+                           <div className="flex items-center justify-between mb-8">
+                              <h3 className="text-xl font-black uppercase flex items-center gap-2"><Key size={20} /> Netlify Env Block</h3>
+                              <button onClick={handleCopyEnv} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
+                                 {copiedEnv ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
+                                 Copy Env
+                              </button>
+                           </div>
+                           <div className="bg-malawi-black p-6 rounded-2xl font-mono text-[10px] text-malawi-green">
                               <pre className="whitespace-pre-wrap">{ENV_TEMPLATE}</pre>
                            </div>
-                           <p className="mt-4 text-[9px] text-gray-400 font-black uppercase flex items-center gap-2">
-                             <ExternalLink size={12} /> Found in: Netlify Dashboard -> Site Configuration -> Environment Variables. **Note: API_KEY is required for the AI Brainstormer.**
-                           </p>
                         </div>
-                      </div>
+                     </div>
+                   )}
+
+                   <div className="flex justify-center">
+                      <button 
+                        onClick={() => setShowTechnicalSetup(!showTechnicalSetup)}
+                        className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-malawi-black flex items-center gap-2 transition-all"
+                      >
+                        <Settings2 size={14} />
+                        {showTechnicalSetup ? 'Hide Technical Setup Guide' : 'Show Technical Setup Guide'}
+                      </button>
                    </div>
                 </div>
 
-                <div className="lg:col-span-4">
-                   <div className="bg-malawi-black text-white p-10 rounded-[3.5rem] border-b-8 border-malawi-red shadow-2xl">
-                      <h3 className="text-xl font-black uppercase mb-6 flex items-center gap-2 text-malawi-red">
-                         <ZapOff size={24} /> Zero-Billing Guard
-                      </h3>
-                      <button 
-                        onClick={handleNuclearPurge}
-                        disabled={isChecking}
-                        className="w-full py-6 bg-malawi-red text-white font-black rounded-3xl uppercase text-xs tracking-widest shadow-xl active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
-                      >
-                        {isChecking ? <Loader2 className="animate-spin" /> : <Trash2 size={18} />}
-                        Billing Safety Purge
-                      </button>
-                      <p className="text-[9px] text-gray-500 font-black uppercase text-center mt-6 leading-relaxed">
-                        Manually force-scrub large data from the cloud to ensure you never exceed free limits.
-                      </p>
+                <div className="lg:col-span-5">
+                   <div className="bg-malawi-black text-white p-12 rounded-[4rem] border-b-[12px] border-malawi-red shadow-2xl relative overflow-hidden">
+                      <div className="relative z-10 space-y-8">
+                         <div className="flex items-center gap-4 text-malawi-red">
+                            <ZapOff size={32} />
+                            <h3 className="text-2xl font-black uppercase tracking-tight">Zero-Billing Guard</h3>
+                         </div>
+                         <p className="text-sm font-bold opacity-60 uppercase leading-relaxed">
+                           Use this tool to scrub large cached images and heavy metadata from your cloud storage. This keeps your database lightweight and ensures you never exceed the free bandwidth limits.
+                         </p>
+                         <button 
+                           onClick={handleNuclearPurge}
+                           disabled={isChecking}
+                           className="w-full py-7 bg-malawi-red hover:bg-red-700 text-white font-black rounded-3xl uppercase text-xs tracking-widest shadow-xl active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
+                         >
+                           {isChecking ? <Loader2 className="animate-spin" /> : <Trash2 size={20} />}
+                           Execute Billing Safety Purge
+                         </button>
+                         <div className="p-5 bg-white/5 border border-white/10 rounded-3xl">
+                            <div className="flex items-center gap-3 text-malawi-green mb-2">
+                               <ShieldCheck size={18} />
+                               <span className="text-[10px] font-black uppercase">Safe for Balances</span>
+                            </div>
+                            <p className="text-[10px] font-bold opacity-40 uppercase">This purge only removes heavy visual caches. All user balances, referrals, and passwords are protected.</p>
+                         </div>
+                      </div>
+                      <div className="absolute top-[-10%] left-[-5%] w-48 h-48 bg-malawi-red/10 rounded-full blur-3xl"></div>
                    </div>
                 </div>
              </div>
