@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, WithdrawalStatus, MembershipStatus, User, WithdrawalRequest, MembershipTier, BookSellerStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { checkCloudHealth, syncAppStateToCloud, uploadImage, nuclearScrub, fetchAppStateFromCloud } from '../dataService';
+// Added missing Smartphone and Clock imports to fix reference errors
 import { 
   ShieldCheck, RefreshCw, Search, 
   X, Wallet, Users, Zap, Award,
@@ -10,7 +11,8 @@ import {
   MessageSquareWarning, Maximize2, Loader2, Database, Trash2,
   Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
   Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode, Settings2,
-  BookOpen
+  BookOpen, Eye, User as UserIcon, Mail, Phone, Hash, Calendar, DollarSign,
+  UserCheck, Smartphone, Clock
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -29,6 +31,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [showTechnicalSetup, setShowTechnicalSetup] = useState(false);
   
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
+  const [inspectingUser, setInspectingUser] = useState<User | null>(null);
   const [payoutNote, setPayoutNote] = useState<{ [key: string]: string }>({});
 
   const SUPABASE_SQL = `-- 1. Create the main data storage table
@@ -139,6 +142,14 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [state.withdrawals, searchText]);
 
+  const filteredUsers = useMemo(() => {
+    return state.users.filter(u => 
+      u.fullName.toLowerCase().includes(searchText.toLowerCase()) || 
+      u.username.toLowerCase().includes(searchText.toLowerCase()) ||
+      u.phone.includes(searchText)
+    ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [state.users, searchText]);
+
   const pendingMemberships = useMemo(() => {
     return state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING);
   }, [state.users]);
@@ -147,12 +158,135 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
     return state.users.filter(u => u.bookSellerStatus === BookSellerStatus.PENDING);
   }, [state.users]);
 
+  const getUserReferrals = (userId: string) => {
+    const l1Count = state.users.filter(u => u.referredBy === userId).length;
+    const l1Ids = state.users.filter(u => u.referredBy === userId).map(u => u.id);
+    const l2Count = state.users.filter(u => l1Ids.includes(u.referredBy || '')).length;
+    return { l1Count, l2Count };
+  };
+
   return (
     <div className="max-w-7xl mx-auto pb-20 animate-in fade-in duration-700">
+      {/* Proof Overlay */}
       {viewingProofUrl && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md" onClick={() => setViewingProofUrl(null)}>
            <button onClick={() => setViewingProofUrl(null)} className="absolute top-6 right-6 p-4 bg-malawi-red text-white rounded-full shadow-xl"><X size={24} /></button>
            <img src={viewingProofUrl} className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl" alt="Proof" />
+        </div>
+      )}
+
+      {/* User Inspector Overlay */}
+      {inspectingUser && (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center p-4 bg-malawi-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 max-h-[90vh] flex flex-col">
+              <div className="bg-malawi-black p-12 text-white flex items-center justify-between relative overflow-hidden">
+                 <div className="relative z-10 flex items-center gap-6">
+                    <div className="w-24 h-24 bg-white/10 rounded-[2.5rem] flex items-center justify-center border-4 border-white/10 text-4xl font-black">
+                       {inspectingUser.fullName.charAt(0)}
+                    </div>
+                    <div>
+                       <h2 className="text-4xl font-black uppercase tracking-tight">{inspectingUser.fullName}</h2>
+                       <div className="flex items-center gap-3 mt-2">
+                          <span className="text-malawi-green text-[10px] font-black uppercase tracking-widest px-3 py-1 bg-white/10 rounded-full">@{inspectingUser.username}</span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${inspectingUser.role === 'ADMIN' ? 'bg-malawi-red' : 'bg-blue-600'}`}>{inspectingUser.role}</span>
+                       </div>
+                    </div>
+                 </div>
+                 <button onClick={() => setInspectingUser(null)} className="relative z-10 p-5 bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95"><X size={32} /></button>
+                 <div className="absolute top-[-50%] right-[-10%] w-96 h-96 bg-malawi-red/20 rounded-full blur-3xl"></div>
+              </div>
+
+              <div className="flex-grow overflow-y-auto p-12">
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* Financial Card */}
+                    <div className="bg-gray-50 p-8 rounded-[3rem] border border-gray-100 space-y-6">
+                       <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                          <DollarSign size={14} className="text-malawi-green" /> Wallet Overview
+                       </h4>
+                       <div className="space-y-4">
+                          <div>
+                             <p className="text-[10px] font-bold text-gray-400 uppercase">Available Balance</p>
+                             <p className="text-3xl font-black text-malawi-green">MWK {inspectingUser.balance.toLocaleString()}</p>
+                          </div>
+                          <div>
+                             <p className="text-[10px] font-bold text-gray-400 uppercase">Lifetime Earnings</p>
+                             <p className="text-xl font-black">MWK {inspectingUser.totalEarnings.toLocaleString()}</p>
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Network Card */}
+                    <div className="bg-gray-50 p-8 rounded-[3rem] border border-gray-100 space-y-6">
+                       <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                          <Users size={14} className="text-blue-600" /> Network Stats
+                       </h4>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                             <p className="text-[9px] font-bold text-gray-400 uppercase">L1 Direct</p>
+                             <p className="text-2xl font-black">{getUserReferrals(inspectingUser.id).l1Count}</p>
+                          </div>
+                          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                             <p className="text-[9px] font-bold text-gray-400 uppercase">L2 Indirect</p>
+                             <p className="text-2xl font-black">{getUserReferrals(inspectingUser.id).l2Count}</p>
+                          </div>
+                       </div>
+                       <div className="pt-2">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase">Referral Code</p>
+                          <p className="text-sm font-mono font-black text-malawi-black">{inspectingUser.referralCode}</p>
+                       </div>
+                    </div>
+
+                    {/* Contact Card */}
+                    <div className="bg-gray-50 p-8 rounded-[3rem] border border-gray-100 space-y-6">
+                       <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                          <Phone size={14} className="text-malawi-red" /> Contact Details
+                       </h4>
+                       <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                             <Mail size={16} className="text-gray-400" />
+                             <p className="text-sm font-bold truncate">{inspectingUser.email}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                             <Smartphone size={16} className="text-gray-400" />
+                             <p className="text-sm font-bold">{inspectingUser.phone}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                             <MessageSquareWarning size={16} className="text-malawi-green" />
+                             <a href={`https://wa.me/${inspectingUser.whatsapp}`} className="text-sm font-black text-malawi-green hover:underline">WhatsApp Portal</a>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-malawi-green/5 p-8 rounded-[3rem] border border-malawi-green/10 flex items-center justify-between">
+                       <div>
+                          <p className="text-[10px] font-black uppercase text-malawi-green tracking-widest">Membership Status</p>
+                          <h5 className="text-lg font-black uppercase mt-1">{inspectingUser.membershipTier}</h5>
+                       </div>
+                       <div className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${inspectingUser.membershipStatus === 'ACTIVE' ? 'bg-malawi-green text-white' : 'bg-gray-200 text-gray-500'}`}>
+                          {inspectingUser.membershipStatus}
+                       </div>
+                    </div>
+                    <div className="bg-malawi-red/5 p-8 rounded-[3rem] border border-malawi-red/10 flex items-center justify-between">
+                       <div>
+                          <p className="text-[10px] font-black uppercase text-malawi-red tracking-widest">Book Selling Permit</p>
+                          <h5 className="text-lg font-black uppercase mt-1">Bookstore Affiliate</h5>
+                       </div>
+                       <div className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${inspectingUser.bookSellerStatus === 'APPROVED' ? 'bg-malawi-red text-white' : 'bg-gray-200 text-gray-500'}`}>
+                          {inspectingUser.bookSellerStatus || 'NONE'}
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-12 border-t bg-gray-50 flex justify-between items-center">
+                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Calendar size={14} /> Joined: {new Date(inspectingUser.createdAt).toLocaleDateString()}
+                 </p>
+                 <button onClick={() => setInspectingUser(null)} className="px-10 py-5 bg-malawi-black text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Close Inspector</button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -164,14 +298,14 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
           <div>
             <h1 className="text-4xl font-black uppercase tracking-tight text-malawi-black">Admin HQ</h1>
             <p className="text-gray-400 font-bold text-xs uppercase tracking-[0.3em] mt-1 flex items-center gap-2">
-              <ShieldCheck size={12} className="text-malawi-green" /> Free-Forever Mode Active
+              <ShieldCheck size={12} className="text-malawi-green" /> Platform Management Active
             </p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">
              <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-             <input type="text" placeholder="Filter..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm outline-none focus:ring-2 focus:ring-malawi-black transition-all font-medium" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+             <input type="text" placeholder="Search affiliates..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm outline-none focus:ring-2 focus:ring-malawi-black transition-all font-medium" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
           </div>
           <button onClick={handleManualSync} className="p-5 bg-white border rounded-[1.5rem] hover:bg-gray-50 transition-all shadow-sm active:scale-95"><RefreshCw size={24} className={isChecking ? 'animate-spin' : ''} /></button>
         </div>
@@ -182,7 +316,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
           { id: 'withdrawals', label: 'Payouts', icon: Wallet, count: state.withdrawals.filter(w => w.status === 'PENDING').length },
           { id: 'memberships', label: 'Activations', icon: Zap, count: pendingMemberships.length },
           { id: 'books', label: 'Book Sellers', icon: BookOpen, count: bookApplications.length },
-          { id: 'users', label: 'Affiliates', icon: Users },
+          { id: 'users', label: 'Affiliates', icon: Users, count: state.users.length },
           { id: 'settings', label: 'Safety', icon: ShieldAlert }
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase border relative transition-all ${tab === t.id ? 'bg-malawi-black text-white shadow-xl scale-105 z-10' : 'bg-white text-gray-400 hover:text-gray-600 shadow-sm'}`}>
@@ -193,6 +327,49 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
       </div>
 
       <main className="bg-white rounded-[3rem] border shadow-2xl overflow-hidden min-h-[600px]">
+        {tab === 'users' && (
+           <div className="overflow-x-auto animate-in fade-in duration-500">
+              <table className="w-full text-left">
+                 <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
+                    <tr>
+                       <th className="px-10 py-6">Affiliate Name</th>
+                       <th className="px-10 py-6">Wallet Balance</th>
+                       <th className="px-10 py-6">Tier Status</th>
+                       <th className="px-10 py-6 text-center">User Inspector</th>
+                    </tr>
+                 </thead>
+                 <tbody className="divide-y">
+                    {filteredUsers.map(u => (
+                       <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-10 py-8">
+                             <p className="font-black text-malawi-black">{u.fullName}</p>
+                             <p className="text-[10px] text-gray-400 uppercase tracking-widest">@{u.username}</p>
+                          </td>
+                          <td className="px-10 py-8">
+                             <p className="font-black text-malawi-green">MWK {u.balance.toLocaleString()}</p>
+                             <p className="text-[9px] text-gray-400 uppercase font-bold">Total: {u.totalEarnings.toLocaleString()}</p>
+                          </td>
+                          <td className="px-10 py-8">
+                             <div className="flex items-center gap-2">
+                                <span className="px-3 py-1 bg-gray-100 rounded-lg text-[9px] font-black uppercase">{u.membershipTier}</span>
+                                {u.membershipStatus === 'ACTIVE' ? <CheckCircle2 size={14} className="text-malawi-green" /> : <Clock size={14} className="text-yellow-500" />}
+                             </div>
+                          </td>
+                          <td className="px-10 py-8 text-center">
+                             <button onClick={() => setInspectingUser(u)} className="px-6 py-2.5 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center justify-center gap-2 mx-auto active:scale-95 shadow-md">
+                                <Eye size={14} /> View Details
+                             </button>
+                          </td>
+                       </tr>
+                    ))}
+                    {filteredUsers.length === 0 && (
+                       <tr><td colSpan={4} className="p-20 text-center text-gray-400 font-bold uppercase italic">No affiliates found matching your search</td></tr>
+                    )}
+                 </tbody>
+              </table>
+           </div>
+        )}
+
         {tab === 'memberships' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
