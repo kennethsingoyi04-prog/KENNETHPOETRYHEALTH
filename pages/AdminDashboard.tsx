@@ -38,13 +38,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [rejectingDistributor, setRejectingDistributor] = useState<User | null>(null);
   const [distributorRejectionNote, setDistributorRejectionNote] = useState("");
 
-  const [banReason, setBanReason] = useState("");
-  const [banType, setBanType] = useState<'PERMANENT' | 'TEMPORARY'>('TEMPORARY');
-  const [banDuration, setBanDuration] = useState("7"); 
-
   const handleManualSync = async () => {
     setIsChecking(true);
-    try { await syncAppStateToCloud(state); alert("Cloud Backup Successful."); } 
+    try { await syncAppStateToCloud(state); alert("Cloud Sync Successful."); } 
     catch (e: any) { alert(e.message); } 
     finally { setIsChecking(false); }
   };
@@ -60,8 +56,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
   const handleProcessPayout = (status: WithdrawalStatus) => {
     if (!processingPayout) return;
-    if (status === WithdrawalStatus.APPROVED && !payoutProofUrl) {
-      alert("Please upload the payout receipt screenshot first.");
+    if (status === WithdrawalStatus.APPROVED && (!payoutProofUrl || !payoutNote.trim())) {
+      alert("Please upload the payout screenshot and provide a reference note for the user.");
       return;
     }
 
@@ -87,7 +83,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     setProcessingPayout(null);
     setPayoutProofUrl(null);
     setPayoutNote("");
-    alert(`Payout ${status}. User notified.`);
+    alert(`Payout ${status}. Mutual record updated.`);
   };
 
   const approveMembership = (targetId: string) => {
@@ -99,7 +95,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     let updatedUsers = [...state.users];
     let updatedReferrals = [...state.referrals];
     
-    updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE, membershipNote: "Membership activated successfully." } : u);
+    updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE, membershipNote: "Membership activated." } : u);
     
     if (targetUser.referredBy) {
       const l1Referrer = updatedUsers.find(u => u.id === targetUser.referredBy);
@@ -121,43 +117,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           balance: u.balance + commission, 
           totalEarnings: u.totalEarnings + commission 
         } : u);
-        
-        if (l1Referrer.referredBy) {
-          const l2Referrer = updatedUsers.find(u => u.id === l1Referrer.referredBy);
-          if (l2Referrer) {
-            const l2Commission = (tierBeingBought.price * 5) / 100;
-            updatedReferrals.push({ 
-              id: `ref-${Date.now()}-L2`, 
-              referrerId: l2Referrer.id, 
-              referredId: targetUser.id, 
-              level: 2, 
-              commission: l2Commission, 
-              timestamp: new Date().toISOString() 
-            });
-            updatedUsers = updatedUsers.map(u => u.id === l2Referrer.id ? { 
-              ...u, 
-              balance: u.balance + l2Commission, 
-              totalEarnings: u.totalEarnings + l2Commission 
-            } : u);
-          }
-        }
       }
     }
     onStateUpdate({ users: updatedUsers, referrals: updatedReferrals });
-    alert("User Activated & Commission Distributed.");
-  };
-
-  const rejectMembership = () => {
-    if (!rejectingActivation) return;
-    const updatedUsers = state.users.map(u => u.id === rejectingActivation.id ? { 
-      ...u, 
-      membershipStatus: MembershipStatus.INACTIVE, 
-      membershipNote: rejectionNote || "Activation proof was invalid or rejected." 
-    } : u);
-    onStateUpdate({ users: updatedUsers });
-    setRejectingActivation(null);
-    setRejectionNote("");
-    alert("Membership Activation Rejected. User has been notified.");
+    alert("Activation Confirmed.");
   };
 
   const handleBookSellerAction = (userId: string, status: BookSellerStatus, note?: string) => {
@@ -167,50 +130,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       membershipNote: status === BookSellerStatus.REJECTED ? (note || "Distributor application rejected.") : "Distributor application approved."
     } : u);
     onStateUpdate({ users: updatedUsers });
-    if (status === BookSellerStatus.REJECTED) {
-      setRejectingDistributor(null);
-      setDistributorRejectionNote("");
-    }
-    alert(`Book Distributor Request ${status === BookSellerStatus.APPROVED ? 'Approved' : 'Rejected'}. User notified.`);
-  };
-
-  const handleUpdateRole = (role: 'USER' | 'ADMIN') => {
-    if (!inspectingUser) return;
-    const updatedUsers = state.users.map(u => u.id === inspectingUser.id ? { ...u, role } : u);
-    onStateUpdate({ users: updatedUsers });
-    setInspectingUser({ ...inspectingUser, role });
-    alert(`Role updated to ${role}.`);
-  };
-
-  const handleBanUser = () => {
-    if (!inspectingUser || !banReason.trim()) return;
-    const expiry = banType === 'TEMPORARY' ? new Date(Date.now() + parseInt(banDuration) * 24 * 60 * 60 * 1000).toISOString() : undefined;
-    const updatedUsers = state.users.map(u => u.id === inspectingUser.id ? { ...u, isBanned: true, banReason, banType, banExpiresAt: expiry } : u);
-    onStateUpdate({ users: updatedUsers });
-    setInspectingUser({ ...inspectingUser, isBanned: true, banReason, banType, banExpiresAt: expiry });
-    setBanReason("");
-  };
-
-  const handleUnbanUser = () => {
-    if (!inspectingUser) return;
-    const updatedUsers = state.users.map(u => u.id === inspectingUser.id ? { ...u, isBanned: false, banReason: undefined, banType: undefined, banExpiresAt: undefined } : u);
-    onStateUpdate({ users: updatedUsers });
-    setInspectingUser({ ...inspectingUser, isBanned: false });
-  };
-
-  const handleComplaintReply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyingTo || !adminReplyText.trim()) return;
-    const updatedComplaints = state.complaints.map(c => c.id === replyingTo.id ? { 
-      ...c, 
-      reply: adminReplyText, 
-      status: 'RESOLVED' as const,
-      updatedAt: new Date().toISOString()
-    } : c);
-    onStateUpdate({ complaints: updatedComplaints });
-    setReplyingTo(null);
-    setAdminReplyText("");
-    alert("Response sent to member.");
+    setRejectingDistributor(null);
+    alert(`Distributor Request ${status}.`);
   };
 
   const pendingWithdrawals = useMemo(() => state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [state.withdrawals]);
@@ -221,32 +142,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     return state.users.filter(u => 
       u.fullName.toLowerCase().includes(searchText.toLowerCase()) || 
       u.username.toLowerCase().includes(searchText.toLowerCase())
-    ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    );
   }, [state.users, searchText]);
-
-  const isOnline = (user: User) => {
-    if (!user.lastLoginAt) return false;
-    return (new Date().getTime() - new Date(user.lastLoginAt).getTime()) < 5 * 60 * 1000;
-  };
-
-  // Logic for viewing PAID referrals of a member
-  const inspectingUserPaidReferrals = useMemo(() => {
-    if (!inspectingUser) return [];
-    return state.referrals
-      .filter(ref => ref.referrerId === inspectingUser.id)
-      .map(ref => {
-        const referredUser = state.users.find(u => u.id === ref.referredId);
-        return {
-          ...ref,
-          user: referredUser
-        };
-      })
-      .filter(item => item.user && item.user.membershipStatus === MembershipStatus.ACTIVE);
-  }, [inspectingUser, state.referrals, state.users]);
 
   return (
     <div className="max-w-7xl mx-auto pb-32 animate-in fade-in duration-700">
-      {/* Overlays */}
       {viewingProofUrl && (
         <div className="fixed inset-0 z-[300] bg-black/90 flex items-center justify-center p-8" onClick={() => setViewingProofUrl(null)}>
            <img src={viewingProofUrl} className="max-w-full max-h-full rounded-2xl shadow-2xl" />
@@ -254,235 +154,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       )}
 
-      {/* Complaint Reply Modal */}
-      {replyingTo && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
-              <div className="bg-malawi-black p-8 text-white flex justify-between items-center">
-                 <h2 className="text-xl font-black uppercase tracking-tight">Reply to Support Ticket</h2>
-                 <button onClick={() => setReplyingTo(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
-              </div>
-              <form onSubmit={handleComplaintReply} className="p-8 space-y-6">
-                 <div className="bg-gray-50 p-6 rounded-2xl border italic text-xs text-gray-600">
-                    "{replyingTo.message}"
-                 </div>
-                 <textarea required rows={4} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium" placeholder="Type your official response..." value={adminReplyText} onChange={e => setAdminReplyText(e.target.value)} />
-                 <button type="submit" className="w-full py-4 bg-malawi-green text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Send Response</button>
-              </form>
-           </div>
-        </div>
-      )}
-
-      {/* Activation Reject Modal */}
-      {rejectingActivation && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
-              <div className="bg-malawi-red p-8 text-white flex justify-between items-center">
-                 <h2 className="text-xl font-black uppercase tracking-tight">Reject Activation</h2>
-                 <button onClick={() => setRejectingActivation(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
-              </div>
-              <div className="p-8 space-y-6">
-                 <p className="text-xs font-bold text-gray-500 uppercase">Provide reason for rejection (this will be shown to the user):</p>
-                 <textarea required rows={3} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium" placeholder="e.g. Transaction ID not found on receipt..." value={rejectionNote} onChange={e => setRejectionNote(e.target.value)} />
-                 <button onClick={rejectMembership} className="w-full py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Confirm Rejection</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Distributor Reject Modal */}
-      {rejectingDistributor && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
-              <div className="bg-malawi-red p-8 text-white flex justify-between items-center">
-                 <h2 className="text-xl font-black uppercase tracking-tight">Reject Distributor</h2>
-                 <button onClick={() => setRejectingDistributor(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
-              </div>
-              <div className="p-8 space-y-6">
-                 <p className="text-xs font-bold text-gray-500 uppercase">Reason for Distributor Rejection:</p>
-                 <textarea required rows={3} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium" placeholder="e.g. Invalid marketing address..." value={distributorRejectionNote} onChange={e => setDistributorRejectionNote(e.target.value)} />
-                 <button onClick={() => handleBookSellerAction(rejectingDistributor.id, BookSellerStatus.REJECTED, distributorRejectionNote)} className="w-full py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Reject Application</button>
-              </div>
-           </div>
-        </div>
-      )}
-
+      {/* Process Payout Modal */}
       {processingPayout && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
               <div className="bg-malawi-black p-8 text-white flex justify-between items-center">
                  <div>
-                    <h2 className="text-xl font-black uppercase tracking-tight">Process Payout</h2>
+                    <h2 className="text-xl font-black uppercase tracking-tight">Send Payout Proof</h2>
                     <p className="text-[10px] font-black text-malawi-green uppercase tracking-widest mt-1">K{processingPayout.amount.toLocaleString()} • {processingPayout.paymentMethod}</p>
                  </div>
                  <button onClick={() => setProcessingPayout(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
               </div>
               <div className="p-8 space-y-6">
                  <div className="bg-gray-50 p-6 rounded-2xl border">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Recipient Phone</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Target Account</p>
                     <div className="flex items-center justify-between">
                        <span className="font-black text-lg text-malawi-black">{processingPayout.phone}</span>
-                       <a href={`https://wa.me/${processingPayout.whatsapp.replace(/\+/g, '')}`} target="_blank" className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg">
-                          <MessageCircle size={14}/> Chat
-                       </a>
+                       <a href={`https://wa.me/${processingPayout.whatsapp.replace(/\+/g, '')}`} target="_blank" className="p-2 bg-green-500 text-white rounded-lg hover:scale-110 transition-transform"><MessageCircle size={16}/></a>
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Upload Payout Screenshot</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Reference Note (Visible to Affiliate)</label>
+                    <textarea required rows={2} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm outline-none" placeholder="e.g. Transaction Ref: KPH-9218..." value={payoutNote} onChange={e => setPayoutNote(e.target.value)} />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Upload Payout Receipt (Mandatory)</label>
                     <div className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center relative ${payoutProofUrl ? 'bg-green-50 border-malawi-green' : 'border-gray-200'}`}>
                        <input type="file" required accept="image/*" onChange={handlePayoutProofUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                       {payoutProofUrl ? <CheckCircle2 className="text-malawi-green" size={24}/> : <ImageIcon className="text-gray-300" size={24}/>}
-                       <p className="text-[9px] font-black uppercase text-gray-400 mt-2">{payoutProofUrl ? 'Receipt Attached' : 'Tap to Upload Receipt'}</p>
+                       {isChecking ? <Loader2 className="animate-spin text-malawi-green" /> : payoutProofUrl ? <CheckCircle2 className="text-malawi-green" size={24}/> : <ImageIcon className="text-gray-300" size={24}/>}
+                       <p className="text-[9px] font-black uppercase text-gray-400 mt-2">{payoutProofUrl ? 'Proof Attached' : 'Tap to Upload Confirmation Screenshot'}</p>
                     </div>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => handleProcessPayout(WithdrawalStatus.APPROVED)} className="py-4 bg-malawi-green text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg">Approve</button>
-                    <button onClick={() => handleProcessPayout(WithdrawalStatus.REJECTED)} className="py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg">Reject</button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {inspectingUser && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-malawi-black/95 backdrop-blur-xl">
-           <div className="bg-white w-full max-w-5xl rounded-[4rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
-              <div className={`p-10 text-white flex items-center justify-between shrink-0 ${inspectingUser.isBanned ? 'bg-malawi-red' : 'bg-malawi-black'}`}>
-                 <div className="flex items-center gap-6">
-                    <div className="relative">
-                      <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-2xl border border-white/20">
-                        {inspectingUser.fullName.charAt(0)}
-                      </div>
-                      <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white ${isOnline(inspectingUser) ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    </div>
-                    <div>
-                       <h2 className="text-3xl font-black uppercase tracking-tight">{inspectingUser.fullName}</h2>
-                       <p className="text-[10px] font-black uppercase tracking-widest opacity-60">@{inspectingUser.username} • Affiliate Since {new Date(inspectingUser.createdAt).toLocaleDateString()}</p>
-                    </div>
-                 </div>
-                 <button onClick={() => setInspectingUser(null)} className="p-4 hover:bg-white/10 rounded-full"><X size={32}/></button>
-              </div>
-              
-              <div className="p-10 overflow-y-auto space-y-10 flex-grow scrollbar-hide">
-                 {/* Summary Stats */}
-                 <div className="grid grid-cols-4 gap-6">
-                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
-                       <p className="text-[10px] font-black uppercase text-gray-400">Current Balance</p>
-                       <p className="text-2xl font-black text-malawi-green">K{inspectingUser.balance.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
-                       <p className="text-[10px] font-black uppercase text-gray-400">Total Profit</p>
-                       <p className="text-2xl font-black">K{inspectingUser.totalEarnings.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
-                       <p className="text-[10px] font-black uppercase text-gray-400">Paid Referrals</p>
-                       <p className="text-2xl font-black">{inspectingUserPaidReferrals.length}</p>
-                    </div>
-                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
-                       <p className="text-[10px] font-black uppercase text-gray-400">Sponsor</p>
-                       <p className="text-sm font-black uppercase">{state.users.find(u => u.id === inspectingUser.referredBy)?.username || 'System'}</p>
-                    </div>
-                 </div>
-
-                 {/* NEW: Paid Referral Network Section */}
-                 <div className="bg-white rounded-[3rem] border p-8 space-y-6">
-                    <div className="flex items-center justify-between">
-                       <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                          <Network className="text-malawi-green" size={24}/> 
-                          Paid Referral Network
-                       </h3>
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Only displaying Active Memberships</p>
-                    </div>
-                    
-                    <div className="overflow-x-auto border rounded-3xl">
-                       <table className="w-full text-left">
-                          <thead className="bg-gray-50 text-[9px] font-black uppercase text-gray-400 border-b">
-                             <tr>
-                                <th className="px-6 py-4">Referred Member</th>
-                                <th className="px-6 py-4">Membership</th>
-                                <th className="px-6 py-4">Network Level</th>
-                                <th className="px-6 py-4 text-right">Commission Earned</th>
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                             {inspectingUserPaidReferrals.length === 0 ? (
-                                <tr>
-                                   <td colSpan={4} className="p-10 text-center text-gray-300 italic uppercase font-black text-xs">No verified paid referrals found</td>
-                                </tr>
-                             ) : (
-                                inspectingUserPaidReferrals.map(item => (
-                                   <tr key={item.id} className="hover:bg-gray-50/50">
-                                      <td className="px-6 py-4">
-                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-malawi-black text-white flex items-center justify-center font-black text-xs">
-                                               {item.user?.fullName.charAt(0)}
-                                            </div>
-                                            <div>
-                                               <p className="text-xs font-black uppercase">{item.user?.fullName}</p>
-                                               <p className="text-[8px] text-gray-400">@{item.user?.username}</p>
-                                            </div>
-                                         </div>
-                                      </td>
-                                      <td className="px-6 py-4">
-                                         <span className="px-2 py-1 bg-gray-100 rounded text-[8px] font-black uppercase" style={{ color: MEMBERSHIP_TIERS.find(t => t.tier === item.user?.membershipTier)?.color }}>
-                                            {item.user?.membershipTier}
-                                         </span>
-                                      </td>
-                                      <td className="px-6 py-4">
-                                         <p className={`text-[10px] font-black uppercase ${item.level === 1 ? 'text-malawi-green' : 'text-malawi-red'}`}>
-                                            Level {item.level} {item.level === 1 ? '(Direct)' : '(Bonus)'}
-                                         </p>
-                                      </td>
-                                      <td className="px-6 py-4 text-right font-black text-malawi-green text-sm">
-                                         K{item.commission.toLocaleString()}
-                                      </td>
-                                   </tr>
-                                ))
-                             )}
-                          </tbody>
-                       </table>
-                    </div>
-                 </div>
-
-                 {/* Book Distributor Profile Section */}
-                 {inspectingUser.bookSellerStatus === BookSellerStatus.APPROVED && (
-                    <div className="bg-red-50/30 rounded-[3rem] border border-malawi-red/10 p-8 space-y-6">
-                       <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><BookOpen className="text-malawi-red" size={20}/> Verified Book Distributor Profile</h3>
-                       <div className="grid grid-cols-2 gap-8">
-                          <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">Distribution Contact</p><p className="font-bold">{inspectingUser.bookSellerWhatsapp || inspectingUser.whatsapp || 'N/A'}</p></div>
-                          <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">Home Address</p><p className="font-bold">{inspectingUser.bookSellerAddress || 'N/A'}</p></div>
-                       </div>
-                    </div>
-                 )}
-
-                 {/* Contact Information */}
-                 <div className="bg-white rounded-[3rem] border p-8 space-y-6">
-                    <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><Smartphone className="text-malawi-green" size={20}/> Basic Contact Information</h3>
-                    <div className="grid grid-cols-2 gap-8">
-                       <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">Phone</p><p className="font-bold">{inspectingUser.phone || 'N/A'}</p></div>
-                       <div className="flex items-center justify-between">
-                          <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">WhatsApp</p><p className="font-bold">{inspectingUser.whatsapp || 'N/A'}</p></div>
-                          {inspectingUser.whatsapp && <a href={`https://wa.me/${inspectingUser.whatsapp.replace(/\+/g, '')}`} target="_blank" className="p-3 bg-green-500 text-white rounded-xl shadow-lg"><ExternalLink size={16}/></a>}
-                       </div>
-                    </div>
-                 </div>
-
-                 {/* Roles & Bans */}
-                 <div className="bg-white rounded-[3rem] border p-8 space-y-6">
-                    <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><Gavel className="text-malawi-red" size={20}/> Discipline & Roles</h3>
-                    <div className="flex items-center justify-between">
-                       <div className={`px-5 py-2 rounded-2xl font-black text-xs uppercase tracking-widest ${inspectingUser.role === 'ADMIN' ? 'bg-malawi-green text-white' : 'bg-gray-100 text-gray-500'}`}>
-                          {inspectingUser.role} ACCESS
-                       </div>
-                       <div className="flex gap-2">
-                          <button onClick={() => handleUpdateRole(inspectingUser.role === 'ADMIN' ? 'USER' : 'ADMIN')} className="px-6 py-3 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase">Toggle Role</button>
-                          {inspectingUser.isBanned ? (
-                             <button onClick={handleUnbanUser} className="px-6 py-3 bg-malawi-green text-white rounded-xl text-[10px] font-black uppercase">Unban User</button>
-                          ) : (
-                             <button onClick={() => setInspectingUser({...inspectingUser, isBanned: true})} className="px-6 py-3 bg-malawi-red text-white rounded-xl text-[10px] font-black uppercase">Start Ban Process</button>
-                          )}
-                       </div>
-                    </div>
+                    <button onClick={() => handleProcessPayout(WithdrawalStatus.APPROVED)} className="py-4 bg-malawi-green text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Approve & Notify</button>
+                    <button onClick={() => handleProcessPayout(WithdrawalStatus.REJECTED)} className="py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Reject Request</button>
                  </div>
               </div>
            </div>
@@ -493,27 +198,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       <header className="mb-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Logo size="md" variant="dark" />
-          <h1 className="text-4xl font-black uppercase tracking-tight">System Control</h1>
+          <h1 className="text-4xl font-black uppercase tracking-tight">KPH Control</h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">
              <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-             <input type="text" placeholder="Search affiliates..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+             <input type="text" placeholder="Search members..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
           </div>
-          <button onClick={handleManualSync} className="p-5 bg-white border rounded-[1.5rem] shadow-sm active:scale-95 transition-all"><RefreshCw size={24} className={isChecking ? 'animate-spin' : ''} /></button>
+          <button onClick={handleManualSync} className="p-5 bg-white border rounded-[1.5rem] shadow-sm active:scale-95 transition-all hover:bg-gray-50"><RefreshCw size={24} className={isChecking ? 'animate-spin' : ''} /></button>
         </div>
       </header>
 
       {/* Tabs */}
       <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide">
         {[
-          { id: 'withdrawals', label: 'Payouts', icon: Wallet, count: pendingWithdrawals.length },
-          { id: 'activations', label: 'Activations', icon: ShieldAlert, count: pendingActivations.length },
-          { id: 'books', label: 'Distributors', icon: BookOpen, count: pendingBookSellers.length },
-          { id: 'users', label: 'Affiliates', icon: Users },
-          { id: 'complaints', label: 'Complaints', icon: MessageSquare, count: state.complaints.filter(c => c.status === 'PENDING').length },
+          { id: 'withdrawals', label: 'Payout Requests', icon: Wallet, count: pendingWithdrawals.length },
+          { id: 'activations', label: 'Membership Activations', icon: ShieldAlert, count: pendingActivations.length },
+          { id: 'books', label: 'Book Distributors', icon: BookOpen, count: pendingBookSellers.length },
+          { id: 'users', label: 'Affiliate Directory', icon: Users },
         ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase border transition-all relative ${tab === t.id ? 'bg-malawi-black text-white shadow-xl' : 'bg-white text-gray-400 shadow-sm'}`}>
+          <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase border transition-all relative whitespace-nowrap ${tab === t.id ? 'bg-malawi-black text-white shadow-xl' : 'bg-white text-gray-400 shadow-sm'}`}>
             <t.icon size={18} /> {t.label}
             {t.count !== undefined && t.count > 0 && <span className="absolute -top-2 -right-2 bg-malawi-red text-white px-2 py-0.5 rounded-full text-[10px] border-2 border-white">{t.count}</span>}
           </button>
@@ -525,37 +229,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="overflow-x-auto">
               <table className="w-full text-left">
                  <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
-                    <tr>
-                       <th className="px-10 py-6">Affiliate</th>
-                       <th className="px-10 py-6">Amount/Method</th>
-                       <th className="px-10 py-6">Target Number</th>
-                       <th className="px-10 py-6 text-center">Verification</th>
-                       <th className="px-10 py-6 text-right">Action</th>
-                    </tr>
+                    <tr><th className="px-10 py-6">Affiliate</th><th className="px-10 py-6">Amount</th><th className="px-10 py-6">Phone</th><th className="px-10 py-6 text-right">Mutual Processing</th></tr>
                  </thead>
                  <tbody className="divide-y">
-                    {pendingWithdrawals.length === 0 ? <tr><td colSpan={5} className="p-20 text-center text-gray-300 italic uppercase font-black">No pending payouts</td></tr> : 
+                    {pendingWithdrawals.length === 0 ? <tr><td colSpan={4} className="p-20 text-center text-gray-300 italic uppercase font-black">No requests found</td></tr> : 
                        pendingWithdrawals.map(w => (
-                          <tr key={w.id} className="hover:bg-gray-50 transition-colors">
-                             <td className="px-10 py-8">
-                                <p className="font-black uppercase tracking-tight text-malawi-black">{w.userName}</p>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase">{new Date(w.createdAt).toLocaleDateString()}</p>
-                             </td>
-                             <td className="px-10 py-8">
-                                <p className="text-xl font-black text-malawi-green">K{w.amount.toLocaleString()}</p>
-                                <p className="text-[10px] font-black text-gray-400 uppercase">{w.paymentMethod}</p>
-                             </td>
-                             <td className="px-10 py-8">
-                                <div className="flex items-center gap-3">
-                                   <p className="font-bold text-sm">{w.phone}</p>
-                                   <a href={`https://wa.me/${w.whatsapp.replace(/\+/g, '')}`} target="_blank" className="p-2 bg-green-100 text-green-600 rounded-lg"><ExternalLink size={14}/></a>
-                                </div>
-                             </td>
-                             <td className="px-10 py-8 text-center">
-                                {w.proofUrl && <button onClick={() => setViewingProofUrl(w.proofUrl!)} className="p-3 bg-gray-100 text-gray-400 rounded-xl hover:text-malawi-black transition-colors"><ImageIcon size={18}/></button>}
-                             </td>
+                          <tr key={w.id} className="hover:bg-gray-50 group">
+                             <td className="px-10 py-8 font-black uppercase text-malawi-black">{w.userName}</td>
+                             <td className="px-10 py-8 font-black text-malawi-green text-xl">K{w.amount.toLocaleString()}</td>
+                             <td className="px-10 py-8 font-bold">{w.phone}</td>
                              <td className="px-10 py-8 text-right">
-                                <button onClick={() => setProcessingPayout(w)} className="px-6 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all">Process Payout</button>
+                                <button onClick={() => setProcessingPayout(w)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 group-hover:bg-malawi-green transition-all">Send Payment Proof</button>
                              </td>
                           </tr>
                        ))
@@ -565,71 +249,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            </div>
         )}
 
-        {tab === 'users' && (
-           <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                 <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
-                    <tr><th className="px-10 py-6">Affiliate</th><th className="px-10 py-6">Membership</th><th className="px-10 py-6">Balance</th><th className="px-10 py-6 text-center">Control</th></tr>
-                 </thead>
-                 <tbody className="divide-y">
-                    {filteredUsers.map(u => (
-                       <tr key={u.id} className={`hover:bg-gray-50/50 ${u.isBanned ? 'bg-red-50' : ''}`}>
-                          <td className="px-10 py-8">
-                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-malawi-black flex items-center justify-center text-white font-black uppercase">{u.fullName.charAt(0)}</div>
-                                <div><p className="font-black uppercase tracking-tight">{u.fullName}</p><p className="text-[10px] text-gray-400">@{u.username}</p></div>
-                             </div>
-                          </td>
-                          <td className="px-10 py-8"><span className="px-3 py-1 bg-gray-100 rounded text-[9px] font-black uppercase">{u.membershipTier}</span></td>
-                          <td className="px-10 py-8 font-black text-malawi-green">K{u.balance.toLocaleString()}</td>
-                          <td className="px-10 py-8 text-center"><button onClick={() => setInspectingUser(u)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all">Inspect Account</button></td>
-                       </tr>
-                    ))}
-                 </tbody>
-              </table>
-           </div>
-        )}
-
-        {tab === 'activations' && (
-           <div className="divide-y">
-              {pendingActivations.length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No pending activations</div> : 
-                 pendingActivations.map(u => (
-                    <div key={u.id} className="p-10 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                       <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 bg-malawi-green text-white rounded-2xl flex items-center justify-center font-black text-xl">{u.fullName.charAt(0)}</div>
-                          <div><h4 className="font-black text-lg uppercase tracking-tight">{u.fullName}</h4><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Applying: {u.membershipTier}</p></div>
-                       </div>
-                       <div className="flex items-center gap-4">
-                          {u.membershipProofUrl && <button onClick={() => setViewingProofUrl(u.membershipProofUrl!)} className="p-4 bg-gray-100 rounded-xl text-gray-400 hover:text-malawi-black transition-colors"><ImageIcon size={20}/></button>}
-                          <div className="flex gap-2">
-                             <button onClick={() => approveMembership(u.id)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 transition-all active:scale-95"><CheckCircle2 size={16}/> Approve</button>
-                             <button onClick={() => setRejectingActivation(u)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 transition-all active:scale-95"><X size={16}/> Reject</button>
-                          </div>
-                       </div>
-                    </div>
-                 ))
-              }
-           </div>
-        )}
-
         {tab === 'books' && (
            <div className="divide-y">
-              {pendingBookSellers.length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No distributor requests</div> : 
+              {pendingBookSellers.length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No requests found</div> : 
                  pendingBookSellers.map(u => (
                     <div key={u.id} className="p-10 flex flex-col hover:bg-gray-50 transition-colors">
-                       <div className="flex items-center justify-between w-full mb-6">
-                          <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-malawi-red text-white rounded-2xl flex items-center justify-center font-black text-xl">{u.fullName.charAt(0)}</div>
-                            <div><h4 className="font-black text-lg uppercase tracking-tight">{u.bookSellerFullName || u.fullName}</h4><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Book Distribution Request</p></div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95"><UserCheck size={16}/> Approve</button>
-                             <button onClick={() => setRejectingDistributor(u)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95"><UserX size={16}/> Reject</button>
+                       <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-black text-lg uppercase">{u.bookSellerFullName || u.fullName}</h4>
+                          <div className="flex gap-2">
+                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95"><UserCheck size={16}/> Approve</button>
+                             <button onClick={() => setRejectingDistributor(u)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95"><UserX size={16}/> Reject</button>
                           </div>
                        </div>
-                       <div className="bg-gray-50 p-6 rounded-3xl grid grid-cols-2 gap-4 border border-gray-100 ml-20 mr-10">
-                          <div className="flex items-center gap-3"><Smartphone className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Contact</p><p className="text-xs font-bold">{u.bookSellerWhatsapp || u.whatsapp}</p></div></div>
-                          <div className="flex items-center gap-3"><MapPin className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Home Address</p><p className="text-xs font-bold">{u.bookSellerAddress}</p></div></div>
+                       <div className="bg-gray-50 p-6 rounded-3xl border text-xs grid grid-cols-2 gap-4">
+                          <p><span className="text-gray-400 uppercase font-black">Distribution Contact:</span> {u.bookSellerWhatsapp || u.whatsapp}</p>
+                          <p><span className="text-gray-400 uppercase font-black">Home Address:</span> {u.bookSellerAddress}</p>
                        </div>
                     </div>
                  ))
@@ -637,28 +271,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            </div>
         )}
 
-        {tab === 'complaints' && (
-           <div className="divide-y">
-              {state.complaints.filter(c => c.status === 'PENDING').length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No open complaints</div> : 
-                 state.complaints.filter(c => c.status === 'PENDING').map(c => (
-                    <div key={c.id} className="p-10 flex flex-col hover:bg-gray-50 transition-colors">
-                       <div className="flex items-center justify-between w-full mb-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-malawi-black rounded-xl flex items-center justify-center text-white font-black text-sm">{c.userName.charAt(0)}</div>
-                            <div>
-                               <h4 className="font-black text-sm uppercase">{c.subject}</h4>
-                               <p className="text-[9px] font-bold text-gray-400 uppercase">From: {c.userName} • {new Date(c.createdAt).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <button onClick={() => setReplyingTo(c)} className="px-6 py-3 bg-malawi-black text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95 flex items-center gap-2"><MessageCircle size={14}/> Respond</button>
-                       </div>
-                       <div className="ml-16 bg-gray-50 p-5 rounded-2xl border text-sm italic text-gray-600">
-                          "{c.message}"
-                       </div>
-                    </div>
-                 ))
-              }
-           </div>
+        {tab === 'users' && (
+           <div className="p-20 text-center text-gray-400 text-xs font-black uppercase italic">Directory View Active ({filteredUsers.length} members found)</div>
         )}
       </main>
     </div>

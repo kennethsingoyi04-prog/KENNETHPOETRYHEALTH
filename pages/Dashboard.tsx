@@ -30,7 +30,10 @@ import {
   Clock,
   XCircle,
   Calculator,
-  Target
+  Target,
+  ImageIcon,
+  X,
+  ExternalLink
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -42,6 +45,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
   const navigate = useNavigate();
   const user = state.currentUser!;
   
+  const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
+
   const myReferrals = useMemo(() => 
     state.referrals.filter(r => r.referrerId === user.id),
     [state.referrals, user.id]
@@ -71,7 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
 
   // Notifications logic
   const notifications = useMemo(() => {
-    const list: { id: string, type: 'info' | 'success' | 'warning' | 'error', title: string, body: string, date: string, icon: any }[] = [];
+    const list: { id: string, type: 'info' | 'success' | 'warning' | 'error', title: string, body: string, date: string, icon: any, action?: () => void, proof?: string }[] = [];
     
     if (user.membershipNote) {
       list.push({
@@ -88,10 +93,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
       list.push({
         id: c.id,
         type: 'info',
-        title: `Support: ${c.subject}`,
-        body: `Admin: "${c.reply}"`,
+        title: `Support Response`,
+        body: `Regarding: ${c.subject}. Click to view.`,
         date: c.updatedAt,
-        icon: MessageSquare
+        icon: MessageSquare,
+        action: () => navigate('/profile?tab=support')
       });
     });
 
@@ -100,14 +106,17 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         id: w.id,
         type: w.status === WithdrawalStatus.APPROVED ? 'success' : 'error',
         title: `Payout ${w.status}`,
-        body: w.adminNote || (w.status === WithdrawalStatus.APPROVED ? 'Your payout was processed.' : 'Payout was rejected.'),
+        body: w.adminNote || (w.status === WithdrawalStatus.APPROVED ? 'Admin has sent your payment receipt.' : 'Your payout was rejected.'),
         date: w.createdAt,
-        icon: w.status === WithdrawalStatus.APPROVED ? CheckCircle : XCircle
+        icon: w.status === WithdrawalStatus.APPROVED ? CheckCircle : XCircle,
+        proof: w.paymentProofUrl
       });
     });
 
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [user, state.complaints, state.withdrawals]);
+  }, [user, state.complaints, state.withdrawals, navigate]);
+
+  const latestAlert = notifications[0];
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
@@ -127,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
       });
       setAiResponse(response.text);
     } catch (err) {
-      setAiResponse("Connectivity issue. Please try your request again.");
+      setAiResponse("Connectivity issue. Please try again.");
     } finally {
       setIsAskingAI(false);
     }
@@ -135,41 +144,50 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
 
   const showBookSellingCTA = !user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE || user.bookSellerStatus === BookSellerStatus.REJECTED;
 
-  const networkTree = useMemo(() => {
-    const level1 = state.users.filter(u => u.referredBy === user.id);
-    return level1.map(l1 => ({
-      ...l1,
-      children: state.users.filter(u => u.referredBy === l1.id)
-    }));
-  }, [state.users, user.id]);
-
-  const NetworkNode = ({ targetUser, level, isRoot = false }: { targetUser: User, level: number, isRoot?: boolean, key?: React.Key }) => (
-    <div className="flex flex-col items-center group">
-      <div className={`relative flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-300 ${
-        isRoot ? 'bg-malawi-black border-malawi-green text-white shadow-xl scale-110 mb-4' : 
-        targetUser.membershipStatus === MembershipStatus.ACTIVE ? 'bg-white border-malawi-green shadow-md hover:scale-105' : 'bg-gray-50 border-gray-100 opacity-60'
-      }`}>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm uppercase ${
-          isRoot ? 'bg-malawi-green text-white' : 
-          targetUser.membershipStatus === MembershipStatus.ACTIVE ? 'bg-malawi-black text-white' : 'bg-gray-200 text-gray-400'
-        }`}>
-          {targetUser.fullName.charAt(0)}
-        </div>
-        <div className="mt-2 text-center">
-          <p className="text-[9px] font-black uppercase truncate max-w-[80px]">{targetUser.fullName.split(' ')[0]}</p>
-          {!isRoot && <p className="text-[7px] font-bold text-gray-400 uppercase">{targetUser.membershipTier}</p>}
-        </div>
-        {targetUser.membershipStatus === MembershipStatus.ACTIVE && !isRoot && (
-           <div className="absolute -top-1 -right-1 bg-malawi-green text-white p-0.5 rounded-full ring-2 ring-white">
-             <CheckCircle size={8} />
-           </div>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6 pb-24 animate-in fade-in duration-700">
+      {viewingProofUrl && (
+        <div className="fixed inset-0 z-[250] bg-black/95 backdrop-blur-md flex items-center justify-center p-8" onClick={() => setViewingProofUrl(null)}>
+           <img src={viewingProofUrl} className="max-w-full max-h-full rounded-2xl shadow-2xl" />
+           <button className="absolute top-10 right-10 text-white p-4 bg-malawi-red rounded-full hover:bg-red-800 transition-colors"><X size={32}/></button>
+        </div>
+      )}
+
+      {/* NEW: Global Prominent Notification Bar */}
+      {latestAlert && (
+        <div className={`p-1 rounded-[2.5rem] shadow-lg animate-in slide-in-from-top-4 duration-500 ring-4 ${latestAlert.type === 'success' ? 'bg-malawi-green ring-malawi-green/10' : 'bg-malawi-red ring-malawi-red/10'}`}>
+           <div className="bg-white px-8 py-4 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                 <div className={`p-3 rounded-2xl ${latestAlert.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                   <latestAlert.icon size={20} />
+                 </div>
+                 <div>
+                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Latest Update</p>
+                   <p className="text-xs font-black uppercase text-malawi-black">{latestAlert.title}</p>
+                 </div>
+              </div>
+              <div className="flex items-center gap-3">
+                 {latestAlert.proof && (
+                    <button 
+                      onClick={() => setViewingProofUrl(latestAlert.proof!)}
+                      className="flex items-center gap-2 px-6 py-3 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:scale-105 transition-all"
+                    >
+                      <ImageIcon size={14} /> View Admin Proof
+                    </button>
+                 )}
+                 {latestAlert.action && (
+                    <button 
+                      onClick={latestAlert.action}
+                      className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Details
+                    </button>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
@@ -179,253 +197,134 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                 <div className="w-4 h-1 bg-malawi-red rounded-full"></div>
                 <div className="w-4 h-1 bg-malawi-green rounded-full"></div>
              </div>
-             {user.bookSellerStatus === BookSellerStatus.APPROVED && (
-                <span className="flex items-center gap-1 bg-malawi-red text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-md animate-pulse">
-                  <BookOpen size={10} /> Verified Seller
-                </span>
-             )}
           </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="px-3 py-1 bg-malawi-green text-white rounded-full text-[9px] font-black uppercase tracking-widest">{currentTier?.name || 'FREE MEMBER'}</span>
-            <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-gray-400">
-              <RefreshCw size={10} className="animate-spin" /> Live Updates On
-            </span>
+            {user.bookSellerStatus === BookSellerStatus.APPROVED && <span className="flex items-center gap-1 px-3 py-1 bg-malawi-red text-white rounded-full text-[9px] font-black uppercase tracking-widest"><BookOpen size={10}/> Verified Distributor</span>}
           </div>
         </div>
-        <div className="bg-malawi-black text-white px-8 py-5 rounded-[2rem] border-b-4 border-malawi-green shadow-xl relative overflow-hidden group">
+        <div className="bg-malawi-black text-white px-8 py-5 rounded-[2rem] border-b-4 border-malawi-green shadow-xl">
           <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Total Balance</p>
           <p className="text-3xl font-black">K{user.balance.toLocaleString()}</p>
-          <Zap className="absolute top-[-20%] right-[-10%] text-white/5 w-24 h-24 rotate-12" />
         </div>
       </header>
 
-      {/* Notifications Panel */}
-      {notifications.length > 0 && (
-        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-          <div className="bg-gray-50 px-8 py-4 border-b flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="text-malawi-red" size={16} />
-              <h3 className="text-xs font-black uppercase tracking-widest">System Messages</h3>
-            </div>
-            <span className="text-[8px] font-black bg-malawi-red text-white px-2 py-0.5 rounded-full uppercase">{notifications.length} New</span>
-          </div>
-          <div className="divide-y max-h-48 overflow-y-auto">
-            {notifications.map(n => (
-              <div key={n.id} className="p-4 hover:bg-gray-50 flex items-start gap-4 transition-colors">
-                <div className={`p-2 rounded-xl shrink-0 ${
-                  n.type === 'success' ? 'bg-green-100 text-green-600' :
-                  n.type === 'error' ? 'bg-red-100 text-red-600' :
-                  n.type === 'warning' ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'
-                }`}>
-                  <n.icon size={16} />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-black uppercase tracking-tight text-malawi-black">{n.title}</p>
-                    <span className="text-[8px] font-bold text-gray-300 uppercase whitespace-nowrap">{new Date(n.date).toLocaleDateString()}</span>
+      {/* System Messages Sidebar / Mobile View */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 space-y-6">
+          {showBookSellingCTA && (
+            <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+              <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                <div className="flex items-center gap-6">
+                  <div className="bg-malawi-red/10 p-5 rounded-3xl text-malawi-red">
+                    <BookOpen size={40} />
                   </div>
-                  <p className="text-[11px] font-medium text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                  <div>
+                    <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Book Distributor Program</h3>
+                    <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your Home Address to start advertising and earning.</p>
+                  </div>
                 </div>
+                <button 
+                  onClick={() => navigate('/profile?tab=bookselling')}
+                  className="px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+                >
+                  Join Now <ArrowRight size={18} />
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* Book Selling CTA */}
-      {showBookSellingCTA && (
-        <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top-4 duration-500 ring-4 ring-malawi-red/10 overflow-hidden relative">
-          <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-            <div className="flex items-center gap-6">
-              <div className="bg-malawi-red/10 p-5 rounded-3xl text-malawi-red shrink-0">
-                <BookOpen size={40} />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-malawi-green transition-all">
+              <div className="p-3 bg-malawi-green/10 text-malawi-green rounded-2xl"><TrendingUp size={24}/></div>
               <div>
-                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Book Distributor Program</h3>
-                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your details to start advertising our books and earn commission.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => navigate('/profile?tab=bookselling')}
-              className="w-full md:w-auto px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-red-800"
-            >
-              Join Now <ArrowRight size={18} />
-            </button>
-          </div>
-          <BookOpen className="absolute -right-10 -bottom-10 w-48 h-48 text-malawi-red/5 -rotate-12" />
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-malawi-green transition-all relative overflow-hidden">
-          <div className="flex items-center gap-4 relative z-10">
-            <div className="p-3 bg-malawi-green/10 text-malawi-green rounded-2xl group-hover:bg-malawi-green group-hover:text-white transition-all"><TrendingUp size={24}/></div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">DIRECT INVITES EARNINGS</p>
-              <div className="flex items-baseline gap-2">
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">DIRECT EARNINGS</p>
                 <p className="text-2xl font-black text-malawi-green">K{directInvitesTotal.toLocaleString()}</p>
-                <p className="text-[10px] font-black text-gray-400 uppercase">({currentTier?.directCommission || 30}% Attached)</p>
               </div>
             </div>
-          </div>
-          <TrendingUp className="absolute right-[-5%] bottom-[-10%] text-gray-50 w-24 h-24 rotate-12" />
-        </div>
 
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-malawi-red transition-all relative overflow-hidden">
-          <div className="flex items-center gap-4 relative z-10">
-            <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl group-hover:bg-malawi-red group-hover:text-white transition-all"><Users size={24}/></div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">INDIRECT INVITES BONUS</p>
-              <div className="flex items-baseline gap-2">
+            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-malawi-red transition-all">
+              <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl"><Users size={24}/></div>
+              <div>
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">NETWORK BONUS</p>
                 <p className="text-2xl font-black text-malawi-red">K{indirectInvitesTotal.toLocaleString()}</p>
-                <p className="text-[10px] font-black text-gray-400 uppercase">(5% Attached)</p>
               </div>
-            </div>
-          </div>
-          <Users className="absolute right-[-5%] bottom-[-10%] text-gray-50 w-24 h-24 -rotate-6" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-6 rounded-3xl border shadow-sm text-center">
-              <p className="text-[10px] font-black uppercase text-gray-400">Total Profits Paid</p>
-              <p className="text-xl font-black text-malawi-green">K{user.totalEarnings.toLocaleString()}</p>
-            </div>
-            <div className="bg-white p-6 rounded-3xl border shadow-sm text-center group cursor-help">
-              <p className="text-[10px] font-black uppercase text-gray-400">Network Size</p>
-              <p className="text-xl font-black group-hover:text-malawi-red transition-colors">{state.users.filter(u => u.referredBy === user.id).length} Active Members</p>
             </div>
           </div>
 
           <div className="bg-malawi-green p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
-            <div className="relative z-10 space-y-4">
-              <h2 className="text-2xl font-black uppercase tracking-tight">Recruitment Link</h2>
-              <p className="text-[10px] font-bold uppercase text-white/60">Invite others and earn up to {currentTier?.directCommission}% instant commission.</p>
-              <div className="flex gap-2">
-                <div className="bg-black/20 p-4 rounded-2xl flex-grow font-mono text-xs truncate border border-white/10">{referralLink}</div>
-                <button onClick={copyToClipboard} className="bg-white text-malawi-green p-4 rounded-2xl shadow-lg active:scale-95 transition-transform"><Copy size={20}/></button>
-              </div>
+            <h2 className="text-2xl font-black uppercase tracking-tight relative z-10">Recruitment Link</h2>
+            <p className="text-[10px] font-bold uppercase text-white/60 relative z-10 mb-4">Earn up to {currentTier?.directCommission}% per active referral.</p>
+            <div className="flex gap-2 relative z-10">
+              <div className="bg-black/20 p-4 rounded-2xl flex-grow font-mono text-xs truncate border border-white/10">{referralLink}</div>
+              <button onClick={copyToClipboard} className="bg-white text-malawi-green p-4 rounded-2xl shadow-lg active:scale-95 transition-transform"><Copy size={20}/></button>
             </div>
             <Award className="absolute top-[-20%] right-[-5%] text-white/10 w-48 h-48 -rotate-12" />
           </div>
-
-          {/* Earnings Projection Calculator */}
-          <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-6">
-             <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Calculator size={16} className="text-malawi-green"/> Profit Projection</h3>
-             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                   <p className="text-[10px] font-black text-gray-400 uppercase">Target Invites this Month</p>
-                   <span className="text-xl font-black">{projectedInvites} Members</span>
-                </div>
-                <input 
-                   type="range" 
-                   min="1" 
-                   max="100" 
-                   value={projectedInvites} 
-                   onChange={(e) => setProjectedInvites(parseInt(e.target.value))}
-                   className="w-full accent-malawi-green"
-                />
-                <div className="p-6 bg-gray-50 rounded-2xl border flex items-center justify-between">
-                   <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase">Potential Earnings</p>
-                      <p className="text-2xl font-black text-malawi-green">K{potentialProfit.toLocaleString()}</p>
-                   </div>
-                   <div className="text-right">
-                      <p className="text-[9px] font-black text-gray-400 uppercase">Tier Bonus</p>
-                      <p className="text-xs font-bold text-malawi-black">{currentTier?.directCommission}% Multiplier</p>
-                   </div>
-                </div>
-             </div>
-          </div>
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Sparkles size={16} className="text-malawi-red"/> Mentor Assistant</h3>
-            <div className="min-h-[100px] flex flex-col">
-              {aiResponse ? (
-                <div className="p-5 bg-gray-50 rounded-2xl text-[11px] font-medium border italic leading-relaxed animate-in slide-in-from-top-2 flex-grow">
-                  "{aiResponse}"
+        <div className="lg:col-span-4 space-y-6">
+           {/* Notification Center */}
+           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden flex flex-col h-full min-h-[400px]">
+             <div className="bg-gray-50 px-8 py-4 border-b flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                   <Bell className="text-malawi-red" size={16} />
+                   <h3 className="text-xs font-black uppercase tracking-widest">History & Alerts</h3>
                 </div>
-              ) : (
-                <div className="flex-grow flex items-center justify-center p-5 border border-dashed rounded-2xl text-[9px] font-black uppercase text-gray-300">
-                  Ask AI for professional recruitment strategies
-                </div>
-              )}
-            </div>
-            <form onSubmit={askMarketingAssistant} className="flex gap-2">
-              <input 
-                value={aiPrompt} 
-                onChange={e => setAiPrompt(e.target.value)} 
-                placeholder="How to grow my network fast?" 
-                className="flex-grow bg-gray-50 p-4 rounded-2xl border outline-none text-xs font-bold"
-              />
-              <button disabled={isAskingAI} className="bg-malawi-black text-white p-4 rounded-2xl active:scale-95 transition-transform shrink-0">
-                {isAskingAI ? <Loader2 className="animate-spin" size={18}/> : <Send size={18}/>}
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-white rounded-[2.5rem] border shadow-sm h-full flex flex-col overflow-hidden max-h-[500px]">
-            <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
-               <h3 className="font-black text-xs uppercase tracking-widest">Network View</h3>
-               <div className="flex bg-gray-200 p-1 rounded-xl">
-                 <button onClick={() => setViewMode('map')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'map' ? 'bg-white text-malawi-black shadow-sm' : 'text-gray-400'}`}><Network size={14} /></button>
-                 <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-malawi-black shadow-sm' : 'text-gray-400'}`}><TrendingDown size={14} /></button>
-               </div>
-            </div>
-            
-            <div className="flex-grow overflow-auto p-6 bg-gray-50/30">
-              {viewMode === 'map' ? (
-                <div className="min-w-fit flex flex-col items-center">
-                  <NetworkNode targetUser={user} level={0} isRoot />
-                  {networkTree.length === 0 ? (
-                    <div className="mt-8 text-center text-gray-300 italic text-[10px] uppercase font-black max-w-[150px]">
-                      Team is empty. Start recruiting to earn!
-                    </div>
-                  ) : (
-                    <div className="mt-4 flex gap-8 items-start relative">
-                      {networkTree.map((l1Node) => (
-                        <div key={l1Node.id} className="flex flex-col items-center relative">
-                          <div className="absolute -top-4 w-px h-4 bg-gray-200"></div>
-                          <NetworkNode targetUser={l1Node} level={1} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="divide-y -mx-6">
-                  {myReferrals.length === 0 ? (
-                    <div className="p-12 text-center text-gray-300 italic text-xs uppercase font-black">No activity found</div>
-                  ) : (
-                    myReferrals.map(ref => {
-                      const target = state.users.find(u => u.id === ref.referredId);
-                      return (
-                        <div key={ref.id} className="p-5 hover:bg-gray-50 transition-colors group">
-                           <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-malawi-black rounded-xl flex items-center justify-center text-white font-black uppercase group-hover:bg-malawi-green transition-colors">{target?.fullName.charAt(0)}</div>
-                              <div className="flex-grow">
-                                 <p className="text-xs font-black uppercase tracking-tight">{target?.fullName}</p>
-                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${target?.membershipStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                   {target?.membershipTier}
-                                 </span>
-                              </div>
-                              <div className="text-right">
-                                 <p className="text-[10px] font-black text-malawi-green">+K{ref.commission.toLocaleString()}</p>
-                                 <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">L{ref.level}</p>
+                <span className="text-[9px] font-black bg-malawi-red text-white px-2 py-0.5 rounded-full uppercase">{notifications.length}</span>
+             </div>
+             <div className="divide-y overflow-y-auto flex-grow max-h-[500px]">
+                {notifications.length === 0 ? (
+                   <div className="p-20 text-center opacity-20">
+                      <Bell size={40} className="mx-auto mb-2"/>
+                      <p className="text-[10px] font-black uppercase">No Alerts</p>
+                   </div>
+                ) : (
+                   notifications.map(n => (
+                     <div key={n.id} className="p-5 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-start gap-4">
+                           <div className={`p-2 rounded-xl shrink-0 ${
+                             n.type === 'success' ? 'bg-green-100 text-green-600' :
+                             n.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+                           }`}>
+                             <n.icon size={16} />
+                           </div>
+                           <div className="flex-grow">
+                              <p className="text-[10px] font-black uppercase text-malawi-black">{n.title}</p>
+                              <p className="text-[11px] font-medium text-gray-500 mt-0.5 leading-snug">{n.body}</p>
+                              <div className="mt-3 flex items-center justify-between">
+                                 <span className="text-[8px] font-black text-gray-300 uppercase">{new Date(n.date).toLocaleDateString()}</span>
+                                 {n.proof && (
+                                    <button onClick={() => setViewingProofUrl(n.proof!)} className="flex items-center gap-1 text-[9px] font-black uppercase text-malawi-green hover:underline">
+                                       <ImageIcon size={12}/> View Proof
+                                    </button>
+                                 )}
                               </div>
                            </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+                     </div>
+                   ))
+                )}
+             </div>
+           </div>
+
+           <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-4">
+             <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-malawi-red"><Sparkles size={16}/> Mentor Assistant</h3>
+             <div className="p-4 bg-gray-50 rounded-2xl text-[11px] font-medium border italic min-h-[80px]">
+               {aiResponse ? `"${aiResponse}"` : "Ask AI for recruitment advice..."}
+             </div>
+             <form onSubmit={askMarketingAssistant} className="flex gap-2">
+               <input 
+                 value={aiPrompt} 
+                 onChange={e => setAiPrompt(e.target.value)} 
+                 placeholder="Ask your mentor..." 
+                 className="flex-grow bg-gray-50 p-4 rounded-2xl border outline-none text-xs font-bold"
+               />
+               <button disabled={isAskingAI} className="bg-malawi-black text-white p-4 rounded-2xl active:scale-95 shrink-0">
+                 {isAskingAI ? <Loader2 className="animate-spin" size={18}/> : <Send size={18}/>}
+               </button>
+             </form>
+           </div>
         </div>
       </div>
     </div>
