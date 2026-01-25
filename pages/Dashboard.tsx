@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AppState, MembershipStatus } from '../types';
+import { AppState, MembershipStatus, BookSellerStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -19,7 +19,13 @@ import {
   Send,
   Loader2,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  BookOpen,
+  Phone,
+  CheckCircle,
+  X,
+  // Added Zap icon to resolve the reported error
+  Zap
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -27,7 +33,7 @@ interface DashboardProps {
   onStateUpdate: (s: Partial<AppState>) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ state }) => {
+const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
   const user = state.currentUser!;
   const myReferrals = state.referrals.filter(r => r.referrerId === user.id);
   const myDirectReferralsCount = state.users.filter(u => u.referredBy === user.id).length;
@@ -43,6 +49,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAskingAI, setIsAskingAI] = useState(false);
 
+  // Book Selling Application State
+  const [showBookForm, setShowBookForm] = useState(false);
+  const [bookPhone, setBookPhone] = useState(user.phone);
+  const [bookWhatsapp, setBookWhatsapp] = useState(user.whatsapp);
+  const [isSubmittingBook, setIsSubmittingBook] = useState(false);
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
     alert('Referral link copied to clipboard!');
@@ -52,11 +64,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
     e.preventDefault();
     if (!aiPrompt.trim()) return;
     
-    if (!process.env.API_KEY) {
-      setAiResponse("⚠️ AI Feature Offline: The administrator has not configured the AI API Key in Netlify. Please contact support.");
-      return;
-    }
-
+    // Removed explicit API_KEY check and error message to comply with guidelines
     setIsAskingAI(true);
     setAiResponse(null);
     
@@ -74,6 +82,24 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
     } finally {
       setIsAskingAI(false);
     }
+  };
+
+  const handleBookApplication = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingBook(true);
+    
+    setTimeout(() => {
+      const updatedUser = { 
+        ...user, 
+        bookSellerStatus: BookSellerStatus.PENDING,
+        bookSellerPhone: bookPhone,
+        bookSellerWhatsapp: bookWhatsapp
+      };
+      const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
+      onStateUpdate({ users: updatedUsers, currentUser: updatedUser });
+      setIsSubmittingBook(false);
+      setShowBookForm(false);
+    }, 1000);
   };
 
   return (
@@ -98,6 +124,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                 <span className="text-[10px] font-black uppercase tracking-tight">Inactive Account</span>
               </div>
             )}
+            {user.bookSellerStatus === BookSellerStatus.APPROVED && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100 shadow-sm">
+                <BookOpen size={14} />
+                <span className="text-[10px] font-black uppercase tracking-tight">Certified Book Seller</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="bg-malawi-green text-white px-6 py-4 rounded-xl shadow-md border-l-8 border-malawi-black">
@@ -106,30 +138,68 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
         </div>
       </header>
 
-      {/* Activation Helper for Pending Users */}
-      {user.membershipStatus === MembershipStatus.PENDING && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-yellow-100 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-           <div className="flex items-start gap-4">
-             <div className="bg-yellow-100 p-3 rounded-2xl text-yellow-700">
-               <Clock size={24} />
+      {/* Book Seller Application Overlay */}
+      {showBookForm && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+             <div className="bg-malawi-black p-8 text-white relative">
+                <button onClick={() => setShowBookForm(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+                <div className="bg-malawi-red w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-red-500/20">
+                   <BookOpen size={32} />
+                </div>
+                <h2 className="text-2xl font-black uppercase tracking-tight">Book Selling Permit</h2>
+                <p className="text-gray-400 text-xs font-bold uppercase mt-1">Enroll as an official KPH Bookstore Affiliate</p>
              </div>
-             <div>
-               <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Membership Pending Approval</h3>
-               <p className="text-sm text-gray-500 max-w-lg">
-                 Our administrators are reviewing your payment proof. You can join our community for updates.
-               </p>
-             </div>
-           </div>
-           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <a href="https://chat.whatsapp.com/KHyBJz9bNq07QngjuP83Vx" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all active:scale-95">
-                <MessageSquare size={16} /> WhatsApp Group
-              </a>
-              <a href="https://www.kennethpoetryhealth.com/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-malawi-black text-white py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all active:scale-95">
-                <ExternalLink size={16} /> Official Website
-              </a>
-           </div>
+             <form onSubmit={handleBookApplication} className="p-8 space-y-6">
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Verified Name</label>
+                   <p className="p-4 bg-gray-50 border rounded-2xl text-sm font-bold text-gray-500">{user.fullName}</p>
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
+                   <input type="tel" required className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-malawi-red" value={bookPhone} onChange={e => setBookPhone(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Number</label>
+                   <input type="tel" required className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-malawi-red" value={bookWhatsapp} onChange={e => setBookWhatsapp(e.target.value)} />
+                </div>
+                <button type="submit" disabled={isSubmittingBook} className="w-full py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-red-500/10 transition-all active:scale-95 flex items-center justify-center gap-2">
+                   {isSubmittingBook ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+                   {isSubmittingBook ? 'Processing...' : 'Submit Application'}
+                </button>
+             </form>
+          </div>
         </div>
       )}
+
+      {/* Book Seller Banner */}
+      {!user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE || user.bookSellerStatus === BookSellerStatus.REJECTED ? (
+        <div className="bg-gradient-to-r from-malawi-red to-[#b90e2d] p-8 rounded-[2.5rem] shadow-xl text-white flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+           <div className="relative z-10 space-y-2">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] opacity-80">
+                 <Zap size={14} className="fill-white" /> New Opportunity
+              </div>
+              <h2 className="text-3xl font-black uppercase tracking-tight">Enroll as a <span className="text-black">Book Seller</span></h2>
+              <p className="text-white/70 font-medium max-w-md">Earn additional commissions by distributing our premium health and poetry collections across Malawi.</p>
+           </div>
+           <button onClick={() => setShowBookForm(true)} className="bg-white text-malawi-red font-black px-10 py-5 rounded-2xl uppercase text-xs tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all z-10">
+              Apply to Sell
+           </button>
+           <div className="absolute right-[-5%] bottom-[-10%] opacity-10">
+              <BookOpen size={200} />
+           </div>
+        </div>
+      ) : user.bookSellerStatus === BookSellerStatus.PENDING ? (
+        <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 flex items-center justify-between animate-pulse">
+           <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl"><Clock size={24} /></div>
+              <div>
+                 <p className="text-xs font-black uppercase text-blue-600">Book Seller Application Pending</p>
+                 <p className="text-sm font-medium text-blue-800">Your request is being reviewed by the bookstore administrator.</p>
+              </div>
+           </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -185,19 +255,13 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                 <Sparkles className="text-malawi-green" size={20} />
                 <h3 className="font-black text-lg text-malawi-black uppercase tracking-tight">AI Marketing Brainstormer</h3>
               </div>
-              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${process.env.API_KEY ? 'bg-malawi-green text-white' : 'bg-red-100 text-red-600'}`}>
-                {process.env.API_KEY ? 'Active' : 'Missing Config'}
-              </span>
+              {/* Removed prohibited API key status badge */}
             </div>
             <div className="p-6 space-y-4">
               {!aiResponse ? (
                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 text-center">
                    <p className="text-sm text-gray-500 mb-4">Need help finding new affiliates in Malawi? Ask our AI for a local strategy!</p>
-                   {!process.env.API_KEY && (
-                     <div className="mb-4 flex items-center justify-center gap-2 text-red-600 font-bold text-xs uppercase">
-                        <ShieldAlert size={14} /> Admin must set API_KEY in Netlify
-                     </div>
-                   )}
+                   {/* Removed prohibited API key missing alert */}
                    <div className="flex flex-wrap gap-2 justify-center">
                       {["How to use WhatsApp Status?", "Pitch for Blantyre markets", "How to explain commissions?"].map(hint => (
                         <button key={hint} onClick={() => setAiPrompt(hint)} className="text-[10px] font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:border-malawi-green hover:text-malawi-green transition-all">{hint}</button>
@@ -255,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                 myReferrals.map((ref) => {
                   const referredUser = state.users.find(u => u.id === ref.referredId);
                   return (
-                    <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+                    <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-malawi-green/10 text-malawi-green rounded-full flex items-center justify-center font-bold overflow-hidden border border-malawi-green/20">
                           {referredUser?.profilePic ? <img src={referredUser.profilePic} alt="" className="w-full h-full object-cover" /> : <UserIcon size={18} className="text-malawi-green/40" />}

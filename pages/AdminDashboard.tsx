@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { AppState, WithdrawalStatus, MembershipStatus, User, WithdrawalRequest, MembershipTier } from '../types';
+import { AppState, WithdrawalStatus, MembershipStatus, User, WithdrawalRequest, MembershipTier, BookSellerStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { checkCloudHealth, syncAppStateToCloud, uploadImage, nuclearScrub, fetchAppStateFromCloud } from '../dataService';
 import { 
@@ -9,7 +9,8 @@ import {
   ImageIcon, CheckCircle2, 
   MessageSquareWarning, Maximize2, Loader2, Database, Trash2,
   Signal, ShieldAlert, Rocket, Terminal, ZapOff, Check, XCircle,
-  Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode, Settings2
+  Copy, ClipboardCheck, Info, ExternalLink, Key, FileCode, Settings2,
+  BookOpen
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -18,7 +19,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate }) => {
-  const [tab, setTab] = useState<'withdrawals' | 'users' | 'memberships' | 'settings'>('withdrawals');
+  const [tab, setTab] = useState<'withdrawals' | 'users' | 'memberships' | 'settings' | 'books'>('withdrawals');
   const [isChecking, setIsChecking] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [connStatus, setConnStatus] = useState<'IDLE' | 'TESTING' | 'SUCCESS' | 'FAILED'>('IDLE');
@@ -119,6 +120,13 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
     onStateUpdate({ users: updatedUsers });
   };
 
+  const handleBookSellerAction = (userId: string, status: BookSellerStatus) => {
+    const updatedUsers = state.users.map(u => 
+      u.id === userId ? { ...u, bookSellerStatus: status } : u
+    );
+    onStateUpdate({ users: updatedUsers });
+  };
+
   const handleWithdrawalAction = (id: string, status: WithdrawalStatus) => {
     const updatedWithdrawals = state.withdrawals.map(w => 
       w.id === id ? { ...w, status, adminNote: payoutNote[id] || '' } : w
@@ -133,6 +141,10 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
 
   const pendingMemberships = useMemo(() => {
     return state.users.filter(u => u.membershipStatus === MembershipStatus.PENDING);
+  }, [state.users]);
+
+  const bookApplications = useMemo(() => {
+    return state.users.filter(u => u.bookSellerStatus === BookSellerStatus.PENDING);
   }, [state.users]);
 
   return (
@@ -169,8 +181,9 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
         {[
           { id: 'withdrawals', label: 'Payouts', icon: Wallet, count: state.withdrawals.filter(w => w.status === 'PENDING').length },
           { id: 'memberships', label: 'Activations', icon: Zap, count: pendingMemberships.length },
+          { id: 'books', label: 'Book Sellers', icon: BookOpen, count: bookApplications.length },
           { id: 'users', label: 'Affiliates', icon: Users },
-          { id: 'settings', label: 'Free Tier Safety', icon: ShieldAlert }
+          { id: 'settings', label: 'Safety', icon: ShieldAlert }
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-xs font-black uppercase border relative transition-all ${tab === t.id ? 'bg-malawi-black text-white shadow-xl scale-105 z-10' : 'bg-white text-gray-400 hover:text-gray-600 shadow-sm'}`}>
             <t.icon size={18} /> {t.label}
@@ -226,6 +239,48 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {tab === 'books' && (
+          <div className="overflow-x-auto">
+             <table className="w-full text-left">
+                <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
+                   <tr>
+                      <th className="px-10 py-6">Affiliate Name</th>
+                      <th className="px-10 py-6">Contact Details</th>
+                      <th className="px-10 py-6">WhatsApp</th>
+                      <th className="px-10 py-6 text-center">Approve / Reject</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y">
+                   {bookApplications.map(u => (
+                      <tr key={u.id} className="hover:bg-gray-50/50">
+                         <td className="px-10 py-8">
+                            <p className="font-black text-malawi-black">{u.fullName}</p>
+                            <p className="text-[10px] text-gray-400 uppercase">@{u.username}</p>
+                         </td>
+                         <td className="px-10 py-8">
+                            <p className="text-sm font-bold">{u.bookSellerPhone || u.phone}</p>
+                         </td>
+                         <td className="px-10 py-8">
+                            <a href={`https://wa.me/${u.bookSellerWhatsapp || u.whatsapp}`} target="_blank" className="text-malawi-green font-black text-[10px] uppercase flex items-center gap-2">
+                               <MessageSquareWarning size={14} /> Open Chat
+                            </a>
+                         </td>
+                         <td className="px-10 py-8">
+                            <div className="flex justify-center gap-3">
+                               <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="bg-green-500 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-600 active:scale-95 transition-all">Approve</button>
+                               <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.REJECTED)} className="bg-red-500 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-600 active:scale-95 transition-all">Reject</button>
+                            </div>
+                         </td>
+                      </tr>
+                   ))}
+                   {bookApplications.length === 0 && (
+                      <tr><td colSpan={4} className="p-20 text-center text-gray-400 font-bold uppercase italic">No pending seller applications</td></tr>
+                   )}
+                </tbody>
+             </table>
           </div>
         )}
 

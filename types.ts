@@ -13,6 +13,13 @@ export enum MembershipStatus {
   ACTIVE = 'ACTIVE'
 }
 
+export enum BookSellerStatus {
+  NONE = 'NONE',
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED'
+}
+
 export enum MembershipTier {
   NONE = 'NONE',
   BRONZE = 'BRONZE',
@@ -59,6 +66,10 @@ export interface User {
   membershipTier: MembershipTier;
   membershipStatus: MembershipStatus;
   membershipProofUrl?: string;
+  // Book Selling Fields
+  bookSellerStatus?: BookSellerStatus;
+  bookSellerPhone?: string;
+  bookSellerWhatsapp?: string;
 }
 
 export interface WithdrawalRequest {
