@@ -208,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
               </div>
               <div>
                 <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Book Distributor Program</h3>
-                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your Home Address to start advertising and earning from sales.</p>
+                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your details to start advertising and earning from physical sales.</p>
               </div>
             </div>
             <button 

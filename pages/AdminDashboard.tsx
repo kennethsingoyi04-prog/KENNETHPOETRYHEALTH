@@ -141,7 +141,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       membershipNote: status === BookSellerStatus.REJECTED ? "Distributor application was not approved. Check your home address details." : "Your book distributor status is now ACTIVE."
     } : u);
     onStateUpdate({ users: updatedUsers });
-    alert(`Distributor application ${status}.`);
+    alert(`Distributor application ${status === BookSellerStatus.APPROVED ? 'Approved' : 'Rejected'}. Affiliate notified.`);
   };
 
   const pendingWithdrawals = useMemo(() => state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [state.withdrawals]);
@@ -381,24 +381,45 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         )}
 
         {tab === 'books' && (
-           <div className="divide-y">
-              {pendingBookSellers.length === 0 ? <div className="p-20 text-center text-gray-300 italic uppercase font-black">No requests found</div> : 
+           <div className="divide-y p-10 space-y-6">
+              {pendingBookSellers.length === 0 ? (
+                <div className="p-20 text-center text-gray-300 italic uppercase font-black">No pending distributor applications found</div>
+              ) : (
                  pendingBookSellers.map(u => (
-                    <div key={u.id} className="p-10 flex flex-col hover:bg-gray-50 transition-colors">
-                       <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-black text-lg uppercase text-malawi-black">{u.bookSellerFullName || u.fullName}</h4>
-                          <div className="flex gap-2">
-                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95">Approve App</button>
-                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.REJECTED)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95">Reject App</button>
+                    <div key={u.id} className="bg-gray-50 rounded-[3rem] p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all">
+                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                          <div className="flex items-center gap-6">
+                             <div className="w-20 h-20 bg-malawi-red rounded-3xl flex items-center justify-center text-white shadow-lg shrink-0">
+                                <BookOpen size={32} />
+                             </div>
+                             <div>
+                                <h4 className="text-xl font-black uppercase text-malawi-black tracking-tight">{u.bookSellerFullName || u.fullName}</h4>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Applying as Local Distributor</p>
+                                <div className="flex items-center gap-3 mt-4">
+                                   <a href={`https://wa.me/${(u.bookSellerWhatsapp || u.whatsapp || '').replace(/\+/g, '')}`} target="_blank" className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg">
+                                      <MessageCircle size={14}/> {u.bookSellerWhatsapp || u.whatsapp}
+                                   </a>
+                                   <div className="flex items-center gap-2 text-gray-500 text-[10px] font-bold">
+                                      <Smartphone size={14}/> {u.phone || 'No phone'}
+                                   </div>
+                                </div>
+                             </div>
                           </div>
-                       </div>
-                       <div className="bg-gray-50 p-6 rounded-3xl border text-xs grid grid-cols-2 gap-4">
-                          <p><span className="text-gray-400 uppercase font-black">Contact:</span> {u.bookSellerWhatsapp || u.whatsapp}</p>
-                          <p><span className="text-gray-400 uppercase font-black">Home Address:</span> {u.bookSellerAddress}</p>
+                          
+                          <div className="flex flex-col gap-4 max-w-md w-full">
+                             <div className="bg-white p-5 rounded-2xl border border-gray-200">
+                                <p className="text-[9px] font-black uppercase text-gray-400 mb-2 flex items-center gap-2"><MapPin size={12}/> Verified Home Address</p>
+                                <p className="text-xs font-bold text-gray-800 leading-relaxed">{u.bookSellerAddress || 'No address provided'}</p>
+                             </div>
+                             <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95"><CheckCircle2 size={16}/> Approve</button>
+                                <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.REJECTED)} className="py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95"><X size={16}/> Reject</button>
+                             </div>
+                          </div>
                        </div>
                     </div>
                  ))
-              }
+              )}
            </div>
         )}
 
