@@ -43,14 +43,13 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     setIsLoading(true);
     setError(null);
     
-    // Safety delay to mimic security check and prevent brute force
+    // Safety delay to mimic security check
     setTimeout(() => {
       const masterKey = state.systemSettings?.masterKey || 'KPH-OWNER-2025';
       const identifier = (formData.username || formData.email || '').toLowerCase().trim();
 
       if (isLogin) {
-        // 1. UNIVERSAL OWNER RECOVERY (Bypass Lockout)
-        // Checks for 'admin', 'owner', or 'kenneth' or ANY existing admin using the Master Key
+        // 1. CRITICAL: MASTER OWNER BYPASS (Immediate Access)
         const isMasterIdentifier = ['admin', 'owner', 'kenneth'].includes(identifier);
         const existingAdmin = state.users.find(u => u.role === 'ADMIN' && (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier));
 
@@ -58,11 +57,10 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           let rootAdmin = existingAdmin;
           
           if (!rootAdmin) {
-             // Create emergency admin if none exists in the cloud to restore system access
              rootAdmin = {
                id: 'root-admin',
                username: identifier || 'admin',
-               fullName: 'Kenneth - KPH Owner',
+               fullName: 'Kenneth - Main Owner',
                email: 'owner@kph.mw',
                phone: '0881234567',
                whatsapp: '0991234567',
@@ -76,11 +74,17 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
                membershipTier: MembershipTier.GOLD,
                membershipStatus: MembershipStatus.ACTIVE,
              };
-             onStateUpdate({ users: [...state.users, rootAdmin] });
+             // Sync new user to state immediately
+             onStateUpdate({ 
+               users: [...state.users, rootAdmin],
+               currentUser: rootAdmin 
+             });
+          } else {
+             // Forceful login for existing admin with Master Key
+             onStateUpdate({ currentUser: rootAdmin });
           }
           
-          // Force login
-          onLogin(rootAdmin.username, formData.password);
+          // Force Navigation
           navigate('/admin');
           setIsLoading(false);
           return;
@@ -94,7 +98,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         }
         const success = onLogin(identifier, formData.password);
         if (!success) {
-          setError('Login failed. If you are the Main Owner, enter your Username and use the Master Key as your password.');
+          setError('Incorrect details. Owners: Use your Username + Master Key.');
           setIsLoading(false);
         } else {
           navigate('/dashboard');
@@ -116,7 +120,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
         
         finishRegistration();
       }
-    }, 1200);
+    }, 1000);
   };
 
   const finishRegistration = () => {
