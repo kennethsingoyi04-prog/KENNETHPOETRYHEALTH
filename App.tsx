@@ -16,7 +16,7 @@ import Navbar from './components/Navbar';
 import Logo from './components/Logo';
 import { User, AppState, MembershipStatus, MembershipTier } from './types';
 import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth } from './dataService';
-import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft, ShieldAlert } from 'lucide-react';
 
 const SESSION_KEY = 'kph_session_uid';
 
@@ -68,8 +68,18 @@ const App: React.FC = () => {
         
         if (cloudData) {
           const cloudUsers = cloudData.users || [];
-          const sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
+          let sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
           
+          // Check for temporary ban expiry
+          if (sessionUser?.isBanned && sessionUser.banType === 'TEMPORARY' && sessionUser.banExpiresAt) {
+             if (new Date() > new Date(sessionUser.banExpiresAt)) {
+                sessionUser.isBanned = false;
+                sessionUser.banType = undefined;
+                sessionUser.banReason = undefined;
+                sessionUser.banExpiresAt = undefined;
+             }
+          }
+
           setState(prev => ({
             ...prev,
             ...cloudData,
@@ -119,18 +129,18 @@ const App: React.FC = () => {
       (!u.password || u.password === password)
     );
     if (user) {
-      // Check for active temporary ban expiry
-      if (user.isBanned && user.banType === 'TEMPORARY' && user.banExpiresAt) {
-        if (new Date() > new Date(user.banExpiresAt)) {
-          // Ban expired
-          user.isBanned = false;
-        }
-      }
-
       const now = new Date().toISOString();
       const updatedUser = { ...user, lastLoginAt: now };
-      const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
       
+      // Auto-expire ban on login if applicable
+      if (updatedUser.isBanned && updatedUser.banType === 'TEMPORARY' && updatedUser.banExpiresAt) {
+         if (new Date() > new Date(updatedUser.banExpiresAt)) {
+            updatedUser.isBanned = false;
+            updatedUser.banType = undefined;
+         }
+      }
+
+      const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
       localStorage.setItem(SESSION_KEY, user.id);
       updateUserState({ users: updatedUsers, currentUser: updatedUser });
       return true;
@@ -155,56 +165,52 @@ const App: React.FC = () => {
     );
   }
 
-  // Handle Banned User View
+  // DISCIPLINE BARRIER: Redirect banned users away from the dashboard
   if (state.currentUser?.isBanned && state.currentUser.role !== 'ADMIN') {
-    const isTemp = state.currentUser.banType === 'TEMPORARY';
-    const expires = state.currentUser.banExpiresAt ? new Date(state.currentUser.banExpiresAt) : null;
-    const stillBanned = !isTemp || (expires && expires > new Date());
-
-    if (stillBanned) {
-      return (
-        <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
-          <div className="w-24 h-24 bg-malawi-red rounded-full flex items-center justify-center mb-8 shadow-2xl shadow-red-500/20 animate-bounce">
-            <Ban size={48} />
+    return (
+      <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="w-32 h-32 bg-malawi-red rounded-full flex items-center justify-center mb-10 shadow-2xl shadow-red-500/20 animate-bounce">
+          <Ban size={64} />
+        </div>
+        <h1 className="text-5xl font-black uppercase tracking-tight mb-6">Account Suspended</h1>
+        <p className="text-gray-400 max-w-lg mb-10 text-lg">
+          Your KENNETHPOETRYHEALTH access has been restricted by the administration for violating platform use policies.
+        </p>
+        
+        <div className="bg-white/5 border border-white/10 p-10 rounded-[3rem] w-full max-w-2xl mb-10 text-left">
+          <div className="flex items-center gap-3 text-malawi-red mb-4">
+             <ShieldAlert size={20} />
+             <span className="text-xs font-black uppercase tracking-widest">Discipline Record</span>
           </div>
-          <h1 className="text-4xl font-black uppercase tracking-tight mb-4">Account Restricted</h1>
-          <p className="text-gray-400 max-w-md mb-8">
-            Access to your KENNETHPOETRYHEALTH account has been suspended by the administration for violating platform policies.
-          </p>
-          
-          <div className="bg-white/5 border border-white/10 p-8 rounded-[3rem] w-full max-w-lg mb-8">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-malawi-red">
-                <span>Violation Record</span>
-                <span className="bg-malawi-red text-white px-3 py-1 rounded-full">{state.currentUser.banType}</span>
-              </div>
-              <p className="text-xl font-bold italic">"{state.currentUser.banReason || 'Platform Terms of Service Violation'}"</p>
-              {isTemp && expires && (
-                <p className="text-xs text-gray-500 pt-2 border-t border-white/5">
-                  Restrictions will be lifted on: <span className="text-white font-black">{expires.toLocaleString()}</span>
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4 w-full max-w-xs">
-            <a 
-              href={`https://wa.me/${state.users.find(u => u.isOwner)?.whatsapp}`} 
-              target="_blank" 
-              className="bg-malawi-green text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
-            >
-              <MessageCircle size={18} /> Appeal on WhatsApp
-            </a>
-            <button 
-              onClick={logout} 
-              className="bg-white/10 hover:bg-white/20 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
-            >
-              <ArrowLeft size={18} /> Logout
-            </button>
+          <div className="space-y-4">
+             <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Reason for Restriction:</p>
+             <p className="text-2xl font-black italic">"{state.currentUser.banReason || 'Standard Platform Violation'}"</p>
+             {state.currentUser.banType === 'TEMPORARY' && state.currentUser.banExpiresAt && (
+                <div className="pt-6 border-t border-white/5 flex justify-between items-center">
+                   <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Restricted Until:</p>
+                   <p className="font-black text-malawi-green">{new Date(state.currentUser.banExpiresAt).toLocaleString()}</p>
+                </div>
+             )}
           </div>
         </div>
-      );
-    }
+
+        <div className="flex flex-col sm:flex-row gap-5 w-full max-w-md">
+          <a 
+            href={`https://wa.me/${state.users.find(u => u.isOwner)?.whatsapp}`} 
+            target="_blank" 
+            className="flex-grow bg-malawi-green text-white font-black py-6 rounded-3xl uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95"
+          >
+            <MessageCircle size={24} /> Appeal Decision
+          </a>
+          <button 
+            onClick={logout} 
+            className="px-10 bg-white/10 hover:bg-white/20 text-white font-black py-6 rounded-3xl uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all"
+          >
+            <ArrowLeft size={18} /> Logout
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -33,9 +33,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [inspectingUser, setInspectingUser] = useState<User | null>(null);
   const [payoutNote, setPayoutNote] = useState<{ [key: string]: string }>({});
 
-  // Safety State
-  const [adminActionReason, setAdminActionReason] = useState("");
-  const [banDurationDays, setBanDurationDays] = useState("7");
+  // Safety & Discipline State
+  const [disciplineReason, setDisciplineReason] = useState("");
+  const [banDays, setBanDays] = useState("7");
 
   const SUPABASE_SQL = `-- 1. Create the main data storage table
 CREATE TABLE IF NOT EXISTS public.app_state (
@@ -140,21 +140,26 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
     onStateUpdate({ withdrawals: updatedWithdrawals });
   };
 
+  // --- Discipline Handlers ---
   const handleIssueWarning = () => {
-    if (!inspectingUser || !adminActionReason.trim()) return;
+    if (!inspectingUser || !disciplineReason.trim()) {
+      alert("Please provide a reason for the warning.");
+      return;
+    }
     const updatedUsers = state.users.map(u => 
       u.id === inspectingUser.id 
-        ? { ...u, warnings: [...(u.warnings || []), adminActionReason.trim()] } 
+        ? { ...u, warnings: [...(u.warnings || []), disciplineReason.trim()] } 
         : u
     );
     onStateUpdate({ users: updatedUsers });
-    setAdminActionReason("");
-    setInspectingUser(updatedUsers.find(u => u.id === inspectingUser.id) || null);
-    alert("Warning issued to " + inspectingUser.fullName);
+    setDisciplineReason("");
+    const refreshedUser = updatedUsers.find(u => u.id === inspectingUser.id);
+    if (refreshedUser) setInspectingUser(refreshedUser);
+    alert(`Warning issued to ${inspectingUser.fullName}.`);
   };
 
-  const handleBanUser = (type: 'PERMANENT' | 'TEMPORARY') => {
-    if (!inspectingUser || !adminActionReason.trim()) {
+  const handleBan = (type: 'PERMANENT' | 'TEMPORARY') => {
+    if (!inspectingUser || !disciplineReason.trim()) {
       alert("Please provide a reason for the ban.");
       return;
     }
@@ -162,7 +167,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
     let expiresAt = undefined;
     if (type === 'TEMPORARY') {
       const date = new Date();
-      date.setDate(date.getDate() + parseInt(banDurationDays));
+      date.setDate(date.getDate() + parseInt(banDays));
       expiresAt = date.toISOString();
     }
 
@@ -172,18 +177,19 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
             ...u, 
             isBanned: true, 
             banType: type, 
-            banReason: adminActionReason.trim(),
+            banReason: disciplineReason.trim(),
             banExpiresAt: expiresAt
           } 
         : u
     );
     onStateUpdate({ users: updatedUsers });
-    setAdminActionReason("");
-    setInspectingUser(updatedUsers.find(u => u.id === inspectingUser.id) || null);
-    alert(`${type} ban applied to ${inspectingUser.fullName}`);
+    setDisciplineReason("");
+    const refreshedUser = updatedUsers.find(u => u.id === inspectingUser.id);
+    if (refreshedUser) setInspectingUser(refreshedUser);
+    alert(`${type} ban applied to ${inspectingUser.fullName}.`);
   };
 
-  const handleUnbanUser = () => {
+  const handleUnban = () => {
     if (!inspectingUser) return;
     const updatedUsers = state.users.map(u => 
       u.id === inspectingUser.id 
@@ -197,8 +203,9 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
         : u
     );
     onStateUpdate({ users: updatedUsers });
-    setInspectingUser(updatedUsers.find(u => u.id === inspectingUser.id) || null);
-    alert("User has been unbanned.");
+    const refreshedUser = updatedUsers.find(u => u.id === inspectingUser.id);
+    if (refreshedUser) setInspectingUser(refreshedUser);
+    alert(`User ${inspectingUser.fullName} has been unbanned.`);
   };
 
   const filteredWithdrawals = useMemo(() => {
@@ -294,10 +301,6 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                              <p className="text-2xl font-black">{getUserReferralNetwork(inspectingUser.id).l2Count}</p>
                           </div>
                        </div>
-                       <div className="pt-2">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Referral Code</p>
-                          <p className="text-sm font-mono font-black text-malawi-black">{inspectingUser.referralCode}</p>
-                       </div>
                     </div>
 
                     {/* Contact Card */}
@@ -314,78 +317,74 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                              <Smartphone size={16} className="text-gray-400" />
                              <p className="text-sm font-bold">{inspectingUser.phone}</p>
                           </div>
-                          <div className="flex items-center gap-3">
-                             <MessageSquareWarning size={16} className="text-malawi-green" />
-                             <a href={`https://wa.me/${inspectingUser.whatsapp}`} className="text-sm font-black text-malawi-green hover:underline">WhatsApp Portal</a>
-                          </div>
                        </div>
                     </div>
                  </div>
 
-                 {/* Safety & Discipline Section */}
-                 <div className="bg-red-50 p-10 rounded-[4rem] border border-red-100 space-y-8">
+                 {/* SAFETY & DISCIPLINE PANEL */}
+                 <div className="bg-red-50 p-10 rounded-[3.5rem] border border-red-100 space-y-8 shadow-sm">
                     <div className="flex items-center justify-between">
                        <div className="flex items-center gap-4">
-                          <div className="bg-malawi-red text-white p-3 rounded-2xl shadow-lg">
-                             <Gavel size={24} />
+                          <div className="bg-malawi-red text-white p-4 rounded-2xl shadow-lg">
+                             <Gavel size={28} />
                           </div>
                           <div>
-                             <h4 className="text-xl font-black uppercase tracking-tight text-malawi-red">Safety & Discipline</h4>
-                             <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Enforce Platform Terms of Service</p>
+                             <h4 className="text-2xl font-black uppercase tracking-tight text-malawi-red">Safety & Discipline</h4>
+                             <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Enforce Platform Terms & Safety</p>
                           </div>
                        </div>
                        {inspectingUser.isBanned && (
-                          <div className="bg-red-600 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl animate-pulse">
-                             Current Status: {inspectingUser.banType} BANNED
+                          <div className="px-6 py-2 bg-red-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-500/20 animate-pulse">
+                             User is Currently Banned
                           </div>
                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                        <div className="space-y-6">
                           <div className="space-y-2">
-                             <label className="text-[10px] font-black uppercase text-red-400 ml-1">Action Reason / Warning Note</label>
+                             <label className="text-[10px] font-black uppercase text-red-500 ml-1">Disciplinary Reason / Warning Note</label>
                              <textarea 
-                                value={adminActionReason}
-                                onChange={(e) => setAdminActionReason(e.target.value)}
-                                className="w-full p-6 bg-white border border-red-200 rounded-[2rem] text-sm font-medium focus:ring-4 focus:ring-red-100 outline-none resize-none"
+                                value={disciplineReason}
+                                onChange={(e) => setDisciplineReason(e.target.value)}
+                                placeholder="Explain the violation or reasoning behind this action..."
+                                className="w-full p-6 bg-white border border-red-200 rounded-3xl outline-none focus:ring-4 focus:ring-red-100 transition-all font-medium text-sm resize-none"
                                 rows={4}
-                                placeholder="Explain why you are warning or banning this user..."
                              />
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-3">
-                             <button 
-                                onClick={handleIssueWarning}
-                                className="px-6 py-3 bg-yellow-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-yellow-600 transition-all active:scale-95 flex items-center gap-2"
-                             >
-                                <AlertTriangle size={16} /> Issue Official Warning
-                             </button>
                              {inspectingUser.isBanned ? (
                                 <button 
-                                   onClick={handleUnbanUser}
-                                   className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 transition-all active:scale-95 flex items-center gap-2"
+                                   onClick={handleUnban}
+                                   className="px-8 py-4 bg-malawi-green text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-green-700 transition-all active:scale-95 flex items-center gap-2"
                                 >
-                                   <ShieldCheck size={16} /> Lift All Restrictions
+                                   <Check size={18} /> Lift All Restrictions
                                 </button>
                              ) : (
                                 <>
                                    <button 
-                                      onClick={() => handleBanUser('PERMANENT')}
-                                      className="px-6 py-3 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-2"
+                                      onClick={handleIssueWarning}
+                                      className="px-6 py-4 bg-yellow-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-yellow-600 transition-all active:scale-95 flex items-center gap-2"
                                    >
-                                      <Ban size={16} /> Permanent Ban
+                                      <AlertTriangle size={18} /> Issue Warning
+                                   </button>
+                                   <button 
+                                      onClick={() => handleBan('PERMANENT')}
+                                      className="px-6 py-4 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-2"
+                                   >
+                                      <Ban size={18} /> Permanent Ban
                                    </button>
                                    <div className="flex gap-2">
                                       <input 
                                          type="number" 
-                                         className="w-16 p-3 bg-white border rounded-xl text-center text-xs font-black"
-                                         value={banDurationDays}
-                                         onChange={(e) => setBanDurationDays(e.target.value)}
+                                         className="w-16 p-4 bg-white border border-red-200 rounded-2xl text-center font-black text-xs"
+                                         value={banDays}
+                                         onChange={(e) => setBanDays(e.target.value)}
                                       />
                                       <button 
-                                         onClick={() => handleBanUser('TEMPORARY')}
-                                         className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95"
+                                         onClick={() => handleBan('TEMPORARY')}
+                                         className="px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-red-700 transition-all active:scale-95"
                                       >
                                          Temp Ban (Days)
                                       </button>
@@ -395,32 +394,35 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                           </div>
                        </div>
 
-                       <div className="bg-white p-8 rounded-[3rem] border border-red-100 space-y-4 max-h-[250px] overflow-y-auto">
-                          <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Discipline History</h5>
+                       <div className="bg-white p-8 rounded-[2.5rem] border border-red-100 overflow-y-auto max-h-[300px] space-y-4">
+                          <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Discipline Logs</h5>
                           {inspectingUser.isBanned && (
-                             <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
-                                <p className="text-[10px] font-black text-red-600 uppercase">ACTIVE BAN: {inspectingUser.banType}</p>
-                                <p className="text-xs font-bold text-gray-700 mt-1 italic">"{inspectingUser.banReason}"</p>
-                                {inspectingUser.banExpiresAt && <p className="text-[9px] text-gray-400 mt-2">Expires: {new Date(inspectingUser.banExpiresAt).toLocaleString()}</p>}
+                             <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
+                                <p className="text-[10px] font-black uppercase text-red-600">Current Ban: {inspectingUser.banType}</p>
+                                <p className="text-sm font-bold mt-1">"{inspectingUser.banReason}"</p>
+                                {inspectingUser.banExpiresAt && <p className="text-[9px] text-gray-400 mt-1 uppercase font-bold">Expires: {new Date(inspectingUser.banExpiresAt).toLocaleString()}</p>}
                              </div>
                           )}
                           {(inspectingUser.warnings?.length || 0) > 0 ? (
                              <div className="space-y-3">
                                 {inspectingUser.warnings?.map((w, idx) => (
-                                   <div key={idx} className="p-4 bg-yellow-50 border border-yellow-100 rounded-2xl flex items-start gap-3">
+                                   <div key={idx} className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100 flex items-start gap-3">
                                       <AlertTriangle size={14} className="text-yellow-600 shrink-0 mt-0.5" />
-                                      <p className="text-xs font-bold text-gray-700 leading-tight">Warning #{idx+1}: {w}</p>
+                                      <p className="text-xs font-bold text-gray-700 leading-snug">Warning #{idx+1}: {w}</p>
                                    </div>
                                 ))}
                              </div>
                           ) : (
-                             <p className="text-center py-10 text-gray-300 text-[10px] font-black uppercase italic">No warnings issued yet</p>
+                             <div className="flex flex-col items-center justify-center py-12 text-gray-300">
+                                <ShieldCheck size={40} className="opacity-20 mb-2" />
+                                <p className="text-[10px] font-black uppercase tracking-widest italic">Clean Discipline Record</p>
+                             </div>
                           )}
                        </div>
                     </div>
                  </div>
 
-                 {/* Referrals List Section */}
+                 {/* Referral List Section */}
                  <div className="space-y-6">
                     <div className="flex items-center gap-3 border-b pb-4">
                        <ListChecks className="text-malawi-black" size={24} />
@@ -430,7 +432,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div className="space-y-4">
                           <div className="flex items-center justify-between">
-                             <p className="text-[10px] font-black uppercase tracking-widest text-malawi-green">Level 1 (Direct Invitations)</p>
+                             <p className="text-[10px] font-black uppercase tracking-widest text-malawi-green">Level 1 (Direct)</p>
                              <span className="bg-malawi-green/10 text-malawi-green px-3 py-1 rounded-full text-[10px] font-black">{getUserReferralNetwork(inspectingUser.id).l1Count} People</span>
                           </div>
                           <div className="bg-white border rounded-[2rem] overflow-hidden">
@@ -454,7 +456,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
 
                        <div className="space-y-4">
                           <div className="flex items-center justify-between">
-                             <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Level 2 (Indirect Network)</p>
+                             <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Level 2 (Indirect)</p>
                              <span className="bg-blue-600/10 text-blue-600 px-3 py-1 rounded-full text-[10px] font-black">{getUserReferralNetwork(inspectingUser.id).l2Count} People</span>
                           </div>
                           <div className="bg-white border rounded-[2rem] overflow-hidden">
@@ -474,27 +476,6 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                                 <div className="p-10 text-center text-gray-300 text-xs font-bold uppercase italic">No indirect referrals</div>
                              )}
                           </div>
-                       </div>
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="bg-malawi-green/5 p-8 rounded-[3rem] border border-malawi-green/10 flex items-center justify-between">
-                       <div>
-                          <p className="text-[10px] font-black uppercase text-malawi-green tracking-widest">Membership Status</p>
-                          <h5 className="text-lg font-black uppercase mt-1">{inspectingUser.membershipTier}</h5>
-                       </div>
-                       <div className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${inspectingUser.membershipStatus === 'ACTIVE' ? 'bg-malawi-green text-white' : 'bg-gray-200 text-gray-500'}`}>
-                          {inspectingUser.membershipStatus}
-                       </div>
-                    </div>
-                    <div className="bg-malawi-red/5 p-8 rounded-[3rem] border border-malawi-red/10 flex items-center justify-between">
-                       <div>
-                          <p className="text-[10px] font-black uppercase text-malawi-red tracking-widest">Book Selling Permit</p>
-                          <h5 className="text-lg font-black uppercase mt-1">Bookstore Affiliate</h5>
-                       </div>
-                       <div className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${inspectingUser.bookSellerStatus === 'APPROVED' ? 'bg-malawi-red text-white' : 'bg-gray-200 text-gray-500'}`}>
-                          {inspectingUser.bookSellerStatus || 'NONE'}
                        </div>
                     </div>
                  </div>
@@ -563,15 +544,14 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                        <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-10 py-8">
                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center font-black overflow-hidden border">
+                                   {u.profilePic ? <img src={u.profilePic} className="w-full h-full object-cover" /> : u.fullName.charAt(0)}
+                                </div>
                                 <div>
-                                   <p className="font-black text-malawi-black">{u.fullName}</p>
+                                   <p className={`font-black ${u.isBanned ? 'text-red-500 line-through' : 'text-malawi-black'}`}>{u.fullName}</p>
                                    <p className="text-[10px] text-gray-400 uppercase tracking-widest">@{u.username}</p>
                                 </div>
-                                {u.isBanned && (
-                                   <span className="bg-red-600 text-white p-1 rounded-lg" title="BANNED USER">
-                                      <Ban size={12} />
-                                   </span>
-                                )}
+                                {u.isBanned && <Ban size={14} className="text-red-500" />}
                              </div>
                           </td>
                           <td className="px-10 py-8">
@@ -586,7 +566,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                           </td>
                           <td className="px-10 py-8 text-center">
                              <button onClick={() => setInspectingUser(u)} className="px-6 py-2.5 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center justify-center gap-2 mx-auto active:scale-95 shadow-md">
-                                <Eye size={14} /> View Details
+                                <Eye size={14} /> Inspect Affiliate
                              </button>
                           </td>
                        </tr>
@@ -599,6 +579,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
            </div>
         )}
 
+        {/* Existing Membership, Books, Settings, Withdrawals sections... */}
         {tab === 'memberships' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -715,9 +696,6 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                             <div className="bg-white/20 p-5 rounded-3xl border border-white/10">
                                <p className="text-[10px] font-black uppercase opacity-60">Database Size</p>
                                <p className="text-2xl font-black">{payloadSize.toFixed(1)} KB</p>
-                               <div className="w-full bg-white/20 h-1 rounded-full mt-3 overflow-hidden">
-                                  <div className="bg-white h-full" style={{ width: `${Math.min((payloadSize / 512) * 100, 100)}%` }}></div>
-                               </div>
                             </div>
                             <div className="bg-white/20 p-5 rounded-3xl border border-white/10">
                                <p className="text-[10px] font-black uppercase opacity-60">Connection</p>
@@ -725,7 +703,6 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                             </div>
                          </div>
                       </div>
-                      <div className="absolute bottom-[-10%] right-[-5%] w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
                    </div>
 
                    {showTechnicalSetup && (
@@ -738,22 +715,6 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                                  Copy SQL
                               </button>
                            </div>
-                           <div className="bg-malawi-black p-6 rounded-2xl overflow-x-auto">
-                             <pre className="text-[10px] font-mono text-malawi-green leading-relaxed">{SUPABASE_SQL}</pre>
-                           </div>
-                        </div>
-
-                        <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-200">
-                           <div className="flex items-center justify-between mb-8">
-                              <h3 className="text-xl font-black uppercase flex items-center gap-2"><Key size={20} /> Netlify Env Block</h3>
-                              <button onClick={handleCopyEnv} className="flex items-center gap-2 bg-malawi-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95">
-                                 {copiedEnv ? <ClipboardCheck size={14} className="text-malawi-green" /> : <Copy size={14} />}
-                                 Copy Env
-                              </button>
-                           </div>
-                           <div className="bg-malawi-black p-6 rounded-2xl font-mono text-[10px] text-malawi-green">
-                              <pre className="whitespace-pre-wrap">{ENV_TEMPLATE}</pre>
-                           </div>
                         </div>
                      </div>
                    )}
@@ -764,7 +725,7 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                         className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-malawi-black flex items-center gap-2 transition-all"
                       >
                         <Settings2 size={14} />
-                        {showTechnicalSetup ? 'Hide Technical Setup Guide' : 'Show Technical Setup Guide'}
+                        {showTechnicalSetup ? 'Hide Technical Setup' : 'Show Technical Setup'}
                       </button>
                    </div>
                 </div>
@@ -776,26 +737,15 @@ API_KEY=[PASTE_YOUR_GEMINI_API_KEY_HERE]`;
                             <ZapOff size={32} />
                             <h3 className="text-2xl font-black uppercase tracking-tight">Zero-Billing Guard</h3>
                          </div>
-                         <p className="text-sm font-bold opacity-60 uppercase leading-relaxed">
-                           Use this tool to scrub large cached images and heavy metadata from your cloud storage. This keeps your database lightweight and ensures you never exceed the free bandwidth limits.
-                         </p>
                          <button 
                            onClick={handleNuclearPurge}
                            disabled={isChecking}
                            className="w-full py-7 bg-malawi-red hover:bg-red-700 text-white font-black rounded-3xl uppercase text-xs tracking-widest shadow-xl active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
                          >
                            {isChecking ? <Loader2 className="animate-spin" /> : <Trash2 size={20} />}
-                           Execute Billing Safety Purge
+                           Execute Safety Purge
                          </button>
-                         <div className="p-5 bg-white/5 border border-white/10 rounded-3xl">
-                            <div className="flex items-center gap-3 text-malawi-green mb-2">
-                               <ShieldCheck size={18} />
-                               <span className="text-[10px] font-black uppercase">Safe for Balances</span>
-                            </div>
-                            <p className="text-[10px] font-bold opacity-40 uppercase">This purge only removes heavy visual caches. All user balances, referrals, and passwords are protected.</p>
-                         </div>
                       </div>
-                      <div className="absolute top-[-10%] left-[-5%] w-48 h-48 bg-malawi-red/10 rounded-full blur-3xl"></div>
                    </div>
                 </div>
              </div>
