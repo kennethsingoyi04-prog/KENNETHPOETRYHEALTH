@@ -68,11 +68,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAskingAI, setIsAskingAI] = useState(false);
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
-
-  // Projection logic
-  const [projectedInvites, setProjectedInvites] = useState(10);
-  const potentialProfit = (projectedInvites * (currentTier?.price || 2000) * (currentTier?.directCommission || 30)) / 100;
 
   // Notifications logic
   const notifications = useMemo(() => {
@@ -106,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         id: w.id,
         type: w.status === WithdrawalStatus.APPROVED ? 'success' : 'error',
         title: `Payout ${w.status}`,
-        body: w.adminNote || (w.status === WithdrawalStatus.APPROVED ? 'Admin has sent your payment receipt.' : 'Your payout was rejected.'),
+        body: w.adminNote || (w.status === WithdrawalStatus.APPROVED ? 'Payment receipt received from Admin.' : 'Payout was rejected.'),
         date: w.createdAt,
         icon: w.status === WithdrawalStatus.APPROVED ? CheckCircle : XCircle,
         proof: w.paymentProofUrl
@@ -132,11 +127,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `You are an expert affiliate mentor for the 'KENNETHPOETRYHEALTH' platform in Malawi. Provide short, actionable recruitment advice for: "${aiPrompt}". Use encouraging language.`,
+        contents: `You are an expert affiliate mentor for the 'KENNETHPOETRYHEALTH' platform in Malawi. Provide actionable advice for: "${aiPrompt}".`,
       });
       setAiResponse(response.text);
     } catch (err) {
-      setAiResponse("Connectivity issue. Please try again.");
+      setAiResponse("Connectivity issue. Try again later.");
     } finally {
       setIsAskingAI(false);
     }
@@ -153,7 +148,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
       )}
 
-      {/* NEW: Global Prominent Notification Bar */}
+      {/* Global Prominent Notification Bar */}
       {latestAlert && (
         <div className={`p-1 rounded-[2.5rem] shadow-lg animate-in slide-in-from-top-4 duration-500 ring-4 ${latestAlert.type === 'success' ? 'bg-malawi-green ring-malawi-green/10' : 'bg-malawi-red ring-malawi-red/10'}`}>
            <div className="bg-white px-8 py-4 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-4">
@@ -162,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                    <latestAlert.icon size={20} />
                  </div>
                  <div>
-                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Latest Update</p>
+                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Notification Alert</p>
                    <p className="text-xs font-black uppercase text-malawi-black">{latestAlert.title}</p>
                  </div>
               </div>
@@ -172,16 +167,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                       onClick={() => setViewingProofUrl(latestAlert.proof!)}
                       className="flex items-center gap-2 px-6 py-3 bg-malawi-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:scale-105 transition-all"
                     >
-                      <ImageIcon size={14} /> View Admin Proof
+                      <ImageIcon size={14} /> View Admin Receipt
                     </button>
                  )}
                  {latestAlert.action && (
-                    <button 
-                      onClick={latestAlert.action}
-                      className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest"
-                    >
-                      Details
-                    </button>
+                    <button onClick={latestAlert.action} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Open Details</button>
                  )}
               </div>
            </div>
@@ -200,7 +190,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
           </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="px-3 py-1 bg-malawi-green text-white rounded-full text-[9px] font-black uppercase tracking-widest">{currentTier?.name || 'FREE MEMBER'}</span>
-            {user.bookSellerStatus === BookSellerStatus.APPROVED && <span className="flex items-center gap-1 px-3 py-1 bg-malawi-red text-white rounded-full text-[9px] font-black uppercase tracking-widest"><BookOpen size={10}/> Verified Distributor</span>}
+            {user.bookSellerStatus === BookSellerStatus.APPROVED && <span className="flex items-center gap-1 px-3 py-1 bg-malawi-red text-white rounded-full text-[9px] font-black uppercase tracking-widest"><BookOpen size={10}/> Verified Seller</span>}
           </div>
         </div>
         <div className="bg-malawi-black text-white px-8 py-5 rounded-[2rem] border-b-4 border-malawi-green shadow-xl">
@@ -209,49 +199,49 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
       </header>
 
-      {/* System Messages Sidebar / Mobile View */}
+      {/* Book Selling CTA Update */}
+      {showBookSellingCTA && (
+        <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+          <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+            <div className="flex items-center gap-6">
+              <div className="bg-malawi-red/10 p-5 rounded-3xl text-malawi-red">
+                <BookOpen size={40} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Book Distributor Program</h3>
+                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your details below and include your Home Address to start advertising.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => navigate('/profile?tab=bookselling')}
+              className="px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+            >
+              Register Now <ArrowRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-malawi-green transition-all">
+          <div className="p-3 bg-malawi-green/10 text-malawi-green rounded-2xl"><TrendingUp size={24}/></div>
+          <div>
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">DIRECT EARNINGS</p>
+            <p className="text-2xl font-black text-malawi-green">K{directInvitesTotal.toLocaleString()}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-malawi-red transition-all">
+          <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl"><Users size={24}/></div>
+          <div>
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">NETWORK BONUS</p>
+            <p className="text-2xl font-black text-malawi-red">K{indirectInvitesTotal.toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          {showBookSellingCTA && (
-            <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl relative overflow-hidden">
-              <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-                <div className="flex items-center gap-6">
-                  <div className="bg-malawi-red/10 p-5 rounded-3xl text-malawi-red">
-                    <BookOpen size={40} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Book Distributor Program</h3>
-                    <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your Home Address to start advertising and earning.</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => navigate('/profile?tab=bookselling')}
-                  className="px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
-                >
-                  Join Now <ArrowRight size={18} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-malawi-green transition-all">
-              <div className="p-3 bg-malawi-green/10 text-malawi-green rounded-2xl"><TrendingUp size={24}/></div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">DIRECT EARNINGS</p>
-                <p className="text-2xl font-black text-malawi-green">K{directInvitesTotal.toLocaleString()}</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-malawi-red transition-all">
-              <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl"><Users size={24}/></div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">NETWORK BONUS</p>
-                <p className="text-2xl font-black text-malawi-red">K{indirectInvitesTotal.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-
           <div className="bg-malawi-green p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
             <h2 className="text-2xl font-black uppercase tracking-tight relative z-10">Recruitment Link</h2>
             <p className="text-[10px] font-bold uppercase text-white/60 relative z-10 mb-4">Earn up to {currentTier?.directCommission}% per active referral.</p>
@@ -259,57 +249,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
               <div className="bg-black/20 p-4 rounded-2xl flex-grow font-mono text-xs truncate border border-white/10">{referralLink}</div>
               <button onClick={copyToClipboard} className="bg-white text-malawi-green p-4 rounded-2xl shadow-lg active:scale-95 transition-transform"><Copy size={20}/></button>
             </div>
-            <Award className="absolute top-[-20%] right-[-5%] text-white/10 w-48 h-48 -rotate-12" />
           </div>
         </div>
 
         <div className="lg:col-span-4 space-y-6">
-           {/* Notification Center */}
-           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden flex flex-col h-full min-h-[400px]">
-             <div className="bg-gray-50 px-8 py-4 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                   <Bell className="text-malawi-red" size={16} />
-                   <h3 className="text-xs font-black uppercase tracking-widest">History & Alerts</h3>
-                </div>
-                <span className="text-[9px] font-black bg-malawi-red text-white px-2 py-0.5 rounded-full uppercase">{notifications.length}</span>
-             </div>
-             <div className="divide-y overflow-y-auto flex-grow max-h-[500px]">
-                {notifications.length === 0 ? (
-                   <div className="p-20 text-center opacity-20">
-                      <Bell size={40} className="mx-auto mb-2"/>
-                      <p className="text-[10px] font-black uppercase">No Alerts</p>
-                   </div>
-                ) : (
-                   notifications.map(n => (
-                     <div key={n.id} className="p-5 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-start gap-4">
-                           <div className={`p-2 rounded-xl shrink-0 ${
-                             n.type === 'success' ? 'bg-green-100 text-green-600' :
-                             n.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
-                           }`}>
-                             <n.icon size={16} />
-                           </div>
-                           <div className="flex-grow">
-                              <p className="text-[10px] font-black uppercase text-malawi-black">{n.title}</p>
-                              <p className="text-[11px] font-medium text-gray-500 mt-0.5 leading-snug">{n.body}</p>
-                              <div className="mt-3 flex items-center justify-between">
-                                 <span className="text-[8px] font-black text-gray-300 uppercase">{new Date(n.date).toLocaleDateString()}</span>
-                                 {n.proof && (
-                                    <button onClick={() => setViewingProofUrl(n.proof!)} className="flex items-center gap-1 text-[9px] font-black uppercase text-malawi-green hover:underline">
-                                       <ImageIcon size={12}/> View Proof
-                                    </button>
-                                 )}
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-                   ))
-                )}
-             </div>
-           </div>
-
            <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-4">
-             <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-malawi-red"><Sparkles size={16}/> Mentor Assistant</h3>
+             <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-malawi-red"><Sparkles size={16}/> Growth Mentor</h3>
              <div className="p-4 bg-gray-50 rounded-2xl text-[11px] font-medium border italic min-h-[80px]">
                {aiResponse ? `"${aiResponse}"` : "Ask AI for recruitment advice..."}
              </div>
@@ -317,7 +262,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                <input 
                  value={aiPrompt} 
                  onChange={e => setAiPrompt(e.target.value)} 
-                 placeholder="Ask your mentor..." 
+                 placeholder="How to recruit?" 
                  className="flex-grow bg-gray-50 p-4 rounded-2xl border outline-none text-xs font-bold"
                />
                <button disabled={isAskingAI} className="bg-malawi-black text-white p-4 rounded-2xl active:scale-95 shrink-0">

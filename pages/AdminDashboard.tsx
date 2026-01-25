@@ -26,18 +26,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [payoutNote, setPayoutNote] = useState("");
   const [isSubmittingPayout, setIsSubmittingPayout] = useState(false);
 
-  // Complaint reply state
-  const [replyingTo, setReplyingTo] = useState<Complaint | null>(null);
-  const [adminReplyText, setAdminReplyText] = useState("");
-
-  // Membership rejection state
-  const [rejectingActivation, setRejectingActivation] = useState<User | null>(null);
-  const [rejectionNote, setRejectionNote] = useState("");
-
-  // Book Seller rejection state
-  const [rejectingDistributor, setRejectingDistributor] = useState<User | null>(null);
-  const [distributorRejectionNote, setDistributorRejectionNote] = useState("");
-
   const handleManualSync = async () => {
     setIsChecking(true);
     try { await syncAppStateToCloud(state); alert("Cloud Sync Successful."); } 
@@ -57,7 +45,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const handleProcessPayout = (status: WithdrawalStatus) => {
     if (!processingPayout) return;
     if (status === WithdrawalStatus.APPROVED && (!payoutProofUrl || !payoutNote.trim())) {
-      alert("Please upload the payout screenshot and provide a reference note for the user.");
+      alert("Please upload the payout receipt and include a reference note for the member.");
       return;
     }
 
@@ -83,7 +71,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     setProcessingPayout(null);
     setPayoutProofUrl(null);
     setPayoutNote("");
-    alert(`Payout ${status}. Mutual record updated.`);
+    alert(`Withdrawal processed successfully. User has been notified.`);
   };
 
   const approveMembership = (targetId: string) => {
@@ -95,7 +83,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     let updatedUsers = [...state.users];
     let updatedReferrals = [...state.referrals];
     
-    updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE, membershipNote: "Membership activated." } : u);
+    updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE, membershipNote: "Account activated. Start earning!" } : u);
     
     if (targetUser.referredBy) {
       const l1Referrer = updatedUsers.find(u => u.id === targetUser.referredBy);
@@ -123,15 +111,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     alert("Activation Confirmed.");
   };
 
-  const handleBookSellerAction = (userId: string, status: BookSellerStatus, note?: string) => {
+  const handleBookSellerAction = (userId: string, status: BookSellerStatus) => {
     const updatedUsers = state.users.map(u => u.id === userId ? { 
       ...u, 
       bookSellerStatus: status,
-      membershipNote: status === BookSellerStatus.REJECTED ? (note || "Distributor application rejected.") : "Distributor application approved."
+      membershipNote: status === BookSellerStatus.REJECTED ? "Distributor application rejected." : "Distributor application approved."
     } : u);
     onStateUpdate({ users: updatedUsers });
-    setRejectingDistributor(null);
-    alert(`Distributor Request ${status}.`);
+    alert(`Distributor status updated.`);
   };
 
   const pendingWithdrawals = useMemo(() => state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [state.withdrawals]);
@@ -144,6 +131,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
       u.username.toLowerCase().includes(searchText.toLowerCase())
     );
   }, [state.users, searchText]);
+
+  // Inspection Referral Network logic
+  const inspectingUserNetwork = useMemo(() => {
+    if (!inspectingUser) return [];
+    return state.referrals.filter(r => r.referrerId === inspectingUser.id).map(r => ({
+      ...r,
+      user: state.users.find(u => u.id === r.referredId)
+    }));
+  }, [inspectingUser, state.referrals, state.users]);
 
   return (
     <div className="max-w-7xl mx-auto pb-32 animate-in fade-in duration-700">
@@ -160,34 +156,88 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
               <div className="bg-malawi-black p-8 text-white flex justify-between items-center">
                  <div>
-                    <h2 className="text-xl font-black uppercase tracking-tight">Send Payout Proof</h2>
+                    <h2 className="text-xl font-black uppercase tracking-tight">Confirm Payout</h2>
                     <p className="text-[10px] font-black text-malawi-green uppercase tracking-widest mt-1">K{processingPayout.amount.toLocaleString()} • {processingPayout.paymentMethod}</p>
                  </div>
                  <button onClick={() => setProcessingPayout(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
               </div>
               <div className="p-8 space-y-6">
                  <div className="bg-gray-50 p-6 rounded-2xl border">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Target Account</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Target Phone</p>
                     <div className="flex items-center justify-between">
                        <span className="font-black text-lg text-malawi-black">{processingPayout.phone}</span>
-                       <a href={`https://wa.me/${processingPayout.whatsapp.replace(/\+/g, '')}`} target="_blank" className="p-2 bg-green-500 text-white rounded-lg hover:scale-110 transition-transform"><MessageCircle size={16}/></a>
+                       <a href={`https://wa.me/${processingPayout.whatsapp.replace(/\+/g, '')}`} target="_blank" className="p-2 bg-green-500 text-white rounded-lg"><MessageCircle size={16}/></a>
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Reference Note (Visible to Affiliate)</label>
-                    <textarea required rows={2} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm outline-none" placeholder="e.g. Transaction Ref: KPH-9218..." value={payoutNote} onChange={e => setPayoutNote(e.target.value)} />
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Reference Note (Required)</label>
+                    <textarea required rows={2} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm outline-none" placeholder="e.g. Airtel Ref: X882..." value={payoutNote} onChange={e => setPayoutNote(e.target.value)} />
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Upload Payout Receipt (Mandatory)</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Payment Proof Image (Required)</label>
                     <div className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center relative ${payoutProofUrl ? 'bg-green-50 border-malawi-green' : 'border-gray-200'}`}>
                        <input type="file" required accept="image/*" onChange={handlePayoutProofUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                        {isChecking ? <Loader2 className="animate-spin text-malawi-green" /> : payoutProofUrl ? <CheckCircle2 className="text-malawi-green" size={24}/> : <ImageIcon className="text-gray-300" size={24}/>}
-                       <p className="text-[9px] font-black uppercase text-gray-400 mt-2">{payoutProofUrl ? 'Proof Attached' : 'Tap to Upload Confirmation Screenshot'}</p>
+                       <p className="text-[9px] font-black uppercase text-gray-400 mt-2">{payoutProofUrl ? 'Proof Ready' : 'Upload Transaction Screenshot'}</p>
                     </div>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => handleProcessPayout(WithdrawalStatus.APPROVED)} className="py-4 bg-malawi-green text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Approve & Notify</button>
                     <button onClick={() => handleProcessPayout(WithdrawalStatus.REJECTED)} className="py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Reject Request</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Inspect User Modal */}
+      {inspectingUser && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-malawi-black/95 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+              <div className="p-10 bg-malawi-black text-white flex items-center justify-between shrink-0">
+                 <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-2xl uppercase">{inspectingUser.fullName.charAt(0)}</div>
+                    <div>
+                       <h2 className="text-3xl font-black uppercase tracking-tight">{inspectingUser.fullName}</h2>
+                       <p className="text-[10px] font-black uppercase tracking-widest opacity-60">@{inspectingUser.username}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setInspectingUser(null)} className="p-4 hover:bg-white/10 rounded-full"><X size={32}/></button>
+              </div>
+              <div className="p-10 overflow-y-auto space-y-10 flex-grow scrollbar-hide">
+                 <div className="grid grid-cols-3 gap-6">
+                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
+                       <p className="text-[10px] font-black uppercase text-gray-400">Current Balance</p>
+                       <p className="text-2xl font-black text-malawi-green">K{inspectingUser.balance.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
+                       <p className="text-[10px] font-black uppercase text-gray-400">Total Profit</p>
+                       <p className="text-2xl font-black">K{inspectingUser.totalEarnings.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
+                       <p className="text-[10px] font-black uppercase text-gray-400">Direct Referrals</p>
+                       <p className="text-2xl font-black">{inspectingUserNetwork.length}</p>
+                    </div>
+                 </div>
+
+                 <div className="bg-white rounded-[3rem] border p-8 space-y-6">
+                    <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3"><Network className="text-malawi-green" size={24}/> Paid Referral Network</h3>
+                    <div className="overflow-x-auto border rounded-3xl">
+                       <table className="w-full text-left">
+                          <thead className="bg-gray-50 text-[9px] font-black uppercase text-gray-400 border-b">
+                             <tr><th className="px-6 py-4">Referred Member</th><th className="px-6 py-4">Level</th><th className="px-6 py-4 text-right">Commission</th></tr>
+                          </thead>
+                          <tbody className="divide-y">
+                             {inspectingUserNetwork.length === 0 ? <tr><td colSpan={3} className="p-10 text-center text-xs italic text-gray-400">No network history</td></tr> : inspectingUserNetwork.map(r => (
+                                <tr key={r.id}>
+                                   <td className="px-6 py-4 font-black text-xs uppercase">{r.user?.fullName}</td>
+                                   <td className="px-6 py-4 font-bold text-xs">Level {r.level}</td>
+                                   <td className="px-6 py-4 text-right font-black text-malawi-green">K{r.commission.toLocaleString()}</td>
+                                </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
                  </div>
               </div>
            </div>
@@ -205,7 +255,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
              <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
              <input type="text" placeholder="Search members..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
           </div>
-          <button onClick={handleManualSync} className="p-5 bg-white border rounded-[1.5rem] shadow-sm active:scale-95 transition-all hover:bg-gray-50"><RefreshCw size={24} className={isChecking ? 'animate-spin' : ''} /></button>
+          <button onClick={handleManualSync} className="p-5 bg-white border rounded-[1.5rem] shadow-sm hover:bg-gray-50"><RefreshCw size={24} className={isChecking ? 'animate-spin' : ''} /></button>
         </div>
       </header>
 
@@ -229,21 +279,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
            <div className="overflow-x-auto">
               <table className="w-full text-left">
                  <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
-                    <tr><th className="px-10 py-6">Affiliate</th><th className="px-10 py-6">Amount</th><th className="px-10 py-6">Phone</th><th className="px-10 py-6 text-right">Mutual Processing</th></tr>
+                    <tr><th className="px-10 py-6">Affiliate</th><th className="px-10 py-6">Amount</th><th className="px-10 py-6">Phone</th><th className="px-10 py-6 text-right">Action</th></tr>
                  </thead>
                  <tbody className="divide-y">
                     {pendingWithdrawals.length === 0 ? <tr><td colSpan={4} className="p-20 text-center text-gray-300 italic uppercase font-black">No requests found</td></tr> : 
                        pendingWithdrawals.map(w => (
-                          <tr key={w.id} className="hover:bg-gray-50 group">
+                          <tr key={w.id} className="hover:bg-gray-50">
                              <td className="px-10 py-8 font-black uppercase text-malawi-black">{w.userName}</td>
                              <td className="px-10 py-8 font-black text-malawi-green text-xl">K{w.amount.toLocaleString()}</td>
                              <td className="px-10 py-8 font-bold">{w.phone}</td>
                              <td className="px-10 py-8 text-right">
-                                <button onClick={() => setProcessingPayout(w)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 group-hover:bg-malawi-green transition-all">Send Payment Proof</button>
+                                <button onClick={() => setProcessingPayout(w)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all">Process Payout</button>
                              </td>
                           </tr>
                        ))
                     }
+                 </tbody>
+              </table>
+           </div>
+        )}
+
+        {tab === 'users' && (
+           <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                 <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400 border-b">
+                    <tr><th className="px-10 py-6">Affiliate</th><th className="px-10 py-6">Tier</th><th className="px-10 py-6">Balance</th><th className="px-10 py-6 text-right">View</th></tr>
+                 </thead>
+                 <tbody className="divide-y">
+                    {filteredUsers.map(u => (
+                       <tr key={u.id} className="hover:bg-gray-50">
+                          <td className="px-10 py-8 font-black uppercase text-malawi-black">{u.fullName}</td>
+                          <td className="px-10 py-8 text-[10px] font-black text-gray-400">{u.membershipTier}</td>
+                          <td className="px-10 py-8 font-black text-malawi-green">K{u.balance.toLocaleString()}</td>
+                          <td className="px-10 py-8 text-right">
+                             <button onClick={() => setInspectingUser(u)} className="px-6 py-2 bg-gray-100 rounded-xl text-[10px] font-black uppercase">Inspect</button>
+                          </td>
+                       </tr>
+                    ))}
                  </tbody>
               </table>
            </div>
@@ -257,22 +329,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                        <div className="flex items-center justify-between mb-4">
                           <h4 className="font-black text-lg uppercase">{u.bookSellerFullName || u.fullName}</h4>
                           <div className="flex gap-2">
-                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95"><UserCheck size={16}/> Approve</button>
-                             <button onClick={() => setRejectingDistributor(u)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95"><UserX size={16}/> Reject</button>
+                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95">Approve</button>
+                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.REJECTED)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95">Reject</button>
                           </div>
                        </div>
                        <div className="bg-gray-50 p-6 rounded-3xl border text-xs grid grid-cols-2 gap-4">
-                          <p><span className="text-gray-400 uppercase font-black">Distribution Contact:</span> {u.bookSellerWhatsapp || u.whatsapp}</p>
+                          <p><span className="text-gray-400 uppercase font-black">Contact:</span> {u.bookSellerWhatsapp || u.whatsapp}</p>
                           <p><span className="text-gray-400 uppercase font-black">Home Address:</span> {u.bookSellerAddress}</p>
                        </div>
                     </div>
                  ))
               }
            </div>
-        )}
-
-        {tab === 'users' && (
-           <div className="p-20 text-center text-gray-400 text-xs font-black uppercase italic">Directory View Active ({filteredUsers.length} members found)</div>
         )}
       </main>
     </div>
