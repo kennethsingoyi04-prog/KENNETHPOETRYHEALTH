@@ -21,10 +21,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [inspectingUser, setInspectingUser] = useState<User | null>(null);
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
 
-  // Discipline State
   const [banReason, setBanReason] = useState("");
   const [banType, setBanType] = useState<'PERMANENT' | 'TEMPORARY'>('TEMPORARY');
-  const [banDuration, setBanDuration] = useState("7"); // days
+  const [banDuration, setBanDuration] = useState("7"); 
 
   const handleManualSync = async () => {
     setIsChecking(true);
@@ -144,7 +143,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
               </div>
               
               <div className="p-10 overflow-y-auto space-y-8">
-                 {/* Stats Section */}
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-gray-50 p-6 rounded-[2rem] border">
                        <p className="text-[10px] font-black uppercase text-gray-400 mb-1">MWK Balance</p>
@@ -162,7 +160,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                     </div>
                  </div>
 
-                 {/* Disciplinary Section */}
                  <div className="bg-white rounded-[3rem] border border-gray-200 p-8 space-y-6">
                     <div className="flex items-center gap-3 border-b pb-4">
                        <Gavel className="text-malawi-red" size={24} />
@@ -257,7 +254,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       )}
 
-      {/* Header */}
       <header className="mb-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Logo size="md" variant="dark" />
@@ -272,7 +268,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       </header>
 
-      {/* Tabs */}
       <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide">
         {[
           { id: 'withdrawals', label: 'Payouts', icon: Wallet, count: state.withdrawals.filter(w => w.status === WithdrawalStatus.PENDING).length },

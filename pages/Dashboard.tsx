@@ -75,7 +75,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
     }
   };
 
-  // Fixed visibility check for Book Selling CTA
   const showBookSellingCTA = !user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE;
 
   return (
@@ -104,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
       </header>
 
-      {/* Book Selling Discovery Card - Prominent Visibility */}
+      {/* Book Selling CTA - Priority Visibility */}
       {showBookSellingCTA && (
         <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top-4 duration-500 ring-4 ring-malawi-red/10">
           <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6">
@@ -113,15 +112,15 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                 <BookOpen size={40} />
               </div>
               <div>
-                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Activate Book Selling</h3>
-                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your details to start distributing books and earn extra revenue.</p>
+                <h3 className="text-xl font-black uppercase text-malawi-black tracking-tight">Start Selling Books</h3>
+                <p className="text-gray-500 text-xs font-bold uppercase mt-1">Register your shop details to start distributing books and earn revenue.</p>
               </div>
             </div>
             <button 
               onClick={() => navigate('/profile?tab=bookselling')}
               className="w-full md:w-auto px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-red-800"
             >
-              Start Selling <ArrowRight size={18} />
+              Apply Now <ArrowRight size={18} />
             </button>
           </div>
         </div>

@@ -112,7 +112,6 @@ const App: React.FC = () => {
     setState(prev => {
       const newState = { ...prev, ...updatedState };
       
-      // Critical: Maintain session consistency
       if (updatedState.currentUser) {
         localStorage.setItem(SESSION_KEY, updatedState.currentUser.id);
       } else if (updatedState.users && prev.currentUser) {
@@ -123,7 +122,6 @@ const App: React.FC = () => {
       saveToLocal(newState);
       setHasUnsavedChanges(true);
       
-      // Instant Background Sync Attempt
       syncAppStateToCloud(newState).then(success => {
         if (success) setHasUnsavedChanges(false);
       });
@@ -156,7 +154,7 @@ const App: React.FC = () => {
         <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Fast-Loading KENNETH Records...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Connecting to KPH Cloud...</p>
         </div>
       </div>
     );

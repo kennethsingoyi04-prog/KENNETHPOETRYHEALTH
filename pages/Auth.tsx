@@ -59,7 +59,6 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           navigate('/dashboard');
         }
       } else {
-        // Validation for Signup
         if (adminMode && formData.masterKey !== state.systemSettings?.masterKey) {
           setError('Invalid Master Authorization Key.');
           setIsLoading(false);
