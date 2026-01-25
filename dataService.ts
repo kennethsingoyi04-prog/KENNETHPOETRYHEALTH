@@ -11,12 +11,8 @@ export type CloudStatus = {
 };
 
 const STORAGE_KEY = 'kph_local_cache';
-const MAX_PAYLOAD_KB = 450; // Staying safely under the 500KB free-tier sweet spot
+const MAX_PAYLOAD_KB = 450; 
 
-/**
- * THE ULTRA-COMPRESSION GUARD
- * Forces images to be tiny (under 60KB) to ensure you never pay for bandwidth.
- */
 const compressImageLocally = async (file: File): Promise<Blob> => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -28,7 +24,7 @@ const compressImageLocally = async (file: File): Promise<Blob> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_DIM = 700; // Reduced resolution for maximum credit safety
+        const MAX_DIM = 700;
 
         if (width > height) {
           if (width > MAX_DIM) {
@@ -47,7 +43,7 @@ const compressImageLocally = async (file: File): Promise<Blob> => {
         ctx?.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
           resolve(blob || file);
-        }, 'image/jpeg', 0.45); // 45% quality is perfect for receipts and tiny on data
+        }, 'image/jpeg', 0.45);
       };
     };
   });
@@ -85,14 +81,15 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
 
 /**
  * DATABASE SCRUBBER
- * Automatically detects and removes heavy hidden data that causes Netlify bills.
+ * Relaxed limit to ensure user addresses and long emails aren't lost.
  */
 export const nuclearScrub = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) return obj;
   const scrubbed = Array.isArray(obj) ? [] : {};
   for (const key in obj) {
     const value = obj[key];
-    if (typeof value === 'string' && (value.startsWith('data:') || value.length > 200)) {
+    // Limit increased from 200 to 10,000 to protect data integrity
+    if (typeof value === 'string' && (value.startsWith('data:') || value.length > 10000)) {
       (scrubbed as any)[key] = "[PROTECTED_FROM_BILLING]";
     } else if (typeof value === 'object') {
       (scrubbed as any)[key] = nuclearScrub(value);
@@ -127,7 +124,8 @@ export const syncAppStateToCloud = async (state: AppState): Promise<boolean> => 
   const sizeKb = JSON.stringify(cleanData).length / 1024;
 
   if (sizeKb > MAX_PAYLOAD_KB) {
-    throw new Error(`Data size (${sizeKb.toFixed(1)}KB) exceeds Free Tier limit. Contact developer to scrub logs.`);
+    console.error(`Data size (${sizeKb.toFixed(1)}KB) too large.`);
+    return false;
   }
 
   try {

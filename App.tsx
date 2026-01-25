@@ -19,7 +19,7 @@ import { syncAppStateToCloud, fetchAppStateFromCloud, checkCloudHealth, saveToLo
 import { Loader2, RefreshCw, Ban, MessageCircle, ArrowLeft, ShieldAlert, Clock, Gavel, Zap } from 'lucide-react';
 
 const SESSION_KEY = 'kph_session_uid';
-const SYNC_INTERVAL_MS = 15000; // Auto-sync every 15 seconds for "Fast Interaction"
+const SYNC_INTERVAL_MS = 15000;
 
 const App: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
@@ -39,41 +39,6 @@ const App: React.FC = () => {
     referrals: [],
     complaints: []
   });
-
-  // 1. Initial Load and Live-Sync Polling
-  useEffect(() => {
-    const initApp = async () => {
-      // Load from Local Storage instantly
-      const localData = loadFromLocal();
-      if (localData) {
-        setState(prev => ({ ...prev, ...localData }));
-      }
-
-      // First Cloud Fetch
-      const health = await checkCloudHealth();
-      setIsOnline(health.ok);
-
-      if (health.ok) {
-        await fetchAndMergeCloudState();
-      }
-      setIsReady(true);
-    };
-
-    initApp();
-
-    // Set up Auto-Refresh Polling Engine
-    syncTimerRef.current = window.setInterval(async () => {
-      const health = await checkCloudHealth();
-      setIsOnline(health.ok);
-      if (health.ok && !hasUnsavedChanges) {
-        await fetchAndMergeCloudState();
-      }
-    }, SYNC_INTERVAL_MS);
-
-    return () => {
-      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
-    };
-  }, [hasUnsavedChanges]);
 
   const fetchAndMergeCloudState = async () => {
     const cloudData = await fetchAppStateFromCloud();
@@ -97,6 +62,37 @@ const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const initApp = async () => {
+      const localData = loadFromLocal();
+      if (localData) {
+        setState(prev => ({ ...prev, ...localData }));
+      }
+
+      const health = await checkCloudHealth();
+      setIsOnline(health.ok);
+
+      if (health.ok) {
+        await fetchAndMergeCloudState();
+      }
+      setIsReady(true);
+    };
+
+    initApp();
+
+    syncTimerRef.current = window.setInterval(async () => {
+      const health = await checkCloudHealth();
+      setIsOnline(health.ok);
+      if (health.ok && !hasUnsavedChanges) {
+        await fetchAndMergeCloudState();
+      }
+    }, SYNC_INTERVAL_MS);
+
+    return () => {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+    };
+  }, [hasUnsavedChanges]);
+
   const triggerManualSync = async () => {
     if (!isOnline || isSyncing) return;
     setIsSyncing(true);
@@ -116,19 +112,25 @@ const App: React.FC = () => {
     setState(prev => {
       const newState = { ...prev, ...updatedState };
       
-      if (updatedState.users && prev.currentUser) {
+      // Critical: Maintain session consistency
+      if (updatedState.currentUser) {
+        localStorage.setItem(SESSION_KEY, updatedState.currentUser.id);
+      } else if (updatedState.users && prev.currentUser) {
         const refreshedUser = updatedState.users.find(u => u.id === prev.currentUser?.id);
         if (refreshedUser) newState.currentUser = refreshedUser;
       }
 
       saveToLocal(newState);
       setHasUnsavedChanges(true);
+      
+      // Instant Background Sync Attempt
+      syncAppStateToCloud(newState).then(success => {
+        if (success) setHasUnsavedChanges(false);
+      });
+
       return newState;
     });
-
-    // High Speed Optimization: Trigger a sync immediately after local state change
-    setTimeout(() => syncAppStateToCloud({ ...state, ...updatedState }), 100);
-  }, [state]);
+  }, []);
 
   const login = (identifier: string, password?: string) => {
     const user = state.users.find(u => 
@@ -154,13 +156,12 @@ const App: React.FC = () => {
         <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Connecting to Cloud Engine...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Fast-Loading KENNETH Records...</p>
         </div>
       </div>
     );
   }
 
-  // DISCIPLINE BARRIER
   if (state.currentUser?.isBanned && state.currentUser.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-malawi-black flex flex-col items-center justify-center p-6 text-white text-center">
