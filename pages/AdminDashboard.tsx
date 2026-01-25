@@ -6,7 +6,7 @@ import Logo from '../components/Logo';
 import { syncAppStateToCloud } from '../dataService';
 import { 
   ShieldCheck, RefreshCw, Search, 
-  X, Wallet, Users, Zap, Loader2, Monitor, MessageSquare, Check, CheckCircle2, Gavel, ShieldAlert, ImageIcon, Eye, BookOpen, UserCheck, UserX, MapPin, Smartphone, Clock, Calendar, Ban
+  X, Wallet, Users, Zap, Loader2, Monitor, MessageSquare, Check, CheckCircle2, Gavel, ShieldAlert, ImageIcon, Eye, BookOpen, UserCheck, UserX, MapPin, Smartphone, Clock, Calendar, Ban, UserCog, Award
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -65,6 +65,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     const updatedUsers = state.users.map(u => u.id === userId ? { ...u, bookSellerStatus: status } : u);
     onStateUpdate({ users: updatedUsers });
     alert(`Book seller request ${status === BookSellerStatus.APPROVED ? 'Approved' : 'Rejected'}.`);
+  };
+
+  const handleUpdateRole = (role: 'USER' | 'ADMIN') => {
+    if (!inspectingUser) return;
+    if (inspectingUser.id === state.currentUser?.id && role === 'USER') {
+      alert("Safety Lock: You cannot revoke your own administrative privileges.");
+      return;
+    }
+    const updatedUsers = state.users.map(u => u.id === inspectingUser.id ? { ...u, role } : u);
+    onStateUpdate({ users: updatedUsers });
+    setInspectingUser({ ...inspectingUser, role });
+    alert(`Role updated to ${role} for ${inspectingUser.fullName}.`);
   };
 
   const handleBanUser = () => {
@@ -157,6 +169,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                        <p className={`text-xs font-black uppercase px-3 py-1 rounded-full inline-block ${inspectingUser.isBanned ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                           {inspectingUser.isBanned ? 'Banned / Suspended' : 'Active'}
                        </p>
+                    </div>
+                 </div>
+
+                 {/* Role Management Section */}
+                 <div className="bg-white rounded-[3rem] border border-gray-200 p-8 space-y-6">
+                    <div className="flex items-center gap-3 border-b pb-4">
+                       <UserCog className="text-malawi-green" size={24} />
+                       <h3 className="text-lg font-black uppercase tracking-tight">Role Management</h3>
+                    </div>
+                    <div className="flex items-center justify-between">
+                       <div>
+                          <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Current Privileges</p>
+                          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest ${inspectingUser.role === 'ADMIN' ? 'bg-malawi-green text-white' : 'bg-gray-100 text-gray-500'}`}>
+                             {inspectingUser.role === 'ADMIN' ? <ShieldCheck size={14}/> : <Users size={14}/>}
+                             {inspectingUser.role} ACCESS
+                          </div>
+                       </div>
+                       <div className="flex gap-2">
+                          {inspectingUser.role === 'USER' ? (
+                             <button 
+                                onClick={() => handleUpdateRole('ADMIN')}
+                                className="px-8 py-4 bg-malawi-black text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all flex items-center gap-2"
+                             >
+                                <Award size={16}/> Promote to Admin
+                             </button>
+                          ) : (
+                             <button 
+                                onClick={() => handleUpdateRole('USER')}
+                                className="px-8 py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all flex items-center gap-2"
+                             >
+                                <UserX size={16}/> Revoke Admin Rights
+                             </button>
+                          )}
+                       </div>
                     </div>
                  </div>
 
@@ -353,6 +399,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                           <td className="px-10 py-8">
                              <div className="flex items-center gap-3">
                                 {u.isBanned && <Ban size={14} className="text-malawi-red" />}
+                                {u.role === 'ADMIN' && <ShieldCheck size={14} className="text-malawi-green" />}
                                 <div>
                                    <p className={`font-black uppercase tracking-tight ${u.isBanned ? 'text-malawi-red' : ''}`}>{u.fullName}</p>
                                    <p className="text-[10px] text-gray-400">@{u.username}</p>
