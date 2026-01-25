@@ -321,7 +321,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                           {referredUser?.profilePic ? <img src={referredUser.profilePic} alt="" className="w-full h-full object-cover" /> : <UserIcon size={18} className="text-malawi-green/40" />}
                         </div>
                         <div>
-                          {/* Display FULL LEGAL NAME only for the user view as requested */}
                           <p className="font-black text-gray-900 group-hover:text-malawi-green transition-colors text-sm uppercase tracking-tight">{referredUser?.fullName}</p>
                           <p className="text-[10px] text-gray-400 uppercase font-black">Level {ref.level} • {new Date(ref.timestamp).toLocaleDateString()}</p>
                         </div>

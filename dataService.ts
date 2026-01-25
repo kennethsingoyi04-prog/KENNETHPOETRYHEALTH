@@ -13,6 +13,49 @@ export type CloudStatus = {
 // Hard limit to stay in Vercel/Netlify Free Tier forever (300KB is very safe)
 const MAX_PAYLOAD_KB = 300; 
 
+// Netlify Request Guard: Prevents rapid-fire API calls
+let syncTimeout: any = null;
+
+/**
+ * CLIENT-SIDE COMPRESSION TRICK (Netlify Bandwidth Shield)
+ * Resizes images to max 1200px and 0.7 quality before they ever leave the browser.
+ */
+const compressImage = async (file: File): Promise<Blob> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const max_size = 1200;
+
+        if (width > height) {
+          if (width > max_size) {
+            height *= max_size / width;
+            width = max_size;
+          }
+        } else {
+          if (height > max_size) {
+            width *= max_size / height;
+            height = max_size;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          resolve(blob || file);
+        }, 'image/jpeg', 0.7);
+      };
+    };
+  });
+};
+
 /**
  * Checks if the Supabase connection is working and returns payload size.
  */
@@ -66,21 +109,17 @@ export const nuclearScrub = (obj: any): any => {
 
 /**
  * Storage Upload:
- * Images go to 'Storage' (1GB free), NOT 'Database' (500MB free).
- * This keeps the main data sync lightning fast and free.
+ * Images are compressed locally FIRST to save Netlify Bandwidth.
  */
 export const uploadImage = async (file: File, folder: string): Promise<string | null> => {
   try {
-    // Compression check: Reject if file is over 2MB to save storage space
-    if (file.size > 2 * 1024 * 1024) {
-      alert("File too large (Max 2MB). Please compress your image to save space.");
-      return null;
-    }
-
-    const fileName = `${folder}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+    // Perform local compression to save bandwidth
+    const compressedBlob = await compressImage(file);
+    const fileName = `${folder}/${Date.now()}-${file.name.replace(/\s+/g, '_')}.jpg`;
+    
     const { data, error } = await supabase.storage
       .from('images')
-      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+      .upload(fileName, compressedBlob, { cacheControl: '3600', upsert: false });
 
     if (error) throw error;
 
@@ -95,31 +134,40 @@ export const uploadImage = async (file: File, folder: string): Promise<string | 
   }
 };
 
+/**
+ * REQUEST BATCHING TRICK (Netlify Function Shield)
+ * Prevents multiple rapid requests to the server.
+ */
 export const syncAppStateToCloud = async (state: AppState) => {
   if (!state.users || state.users.length === 0) return;
 
-  const { currentUser, ...persistentData } = state;
-  const optimizedData = nuclearScrub(persistentData);
-  const sizeKb = JSON.stringify(optimizedData).length / 1024;
+  if (syncTimeout) clearTimeout(syncTimeout);
 
-  if (sizeKb > MAX_PAYLOAD_KB) {
-    console.error(`Sync Blocked: Payload ${sizeKb.toFixed(1)}KB is too large for the safety limit.`);
-    return;
-  }
+  syncTimeout = setTimeout(async () => {
+    const { currentUser, ...persistentData } = state;
+    const optimizedData = nuclearScrub(persistentData);
+    const sizeKb = JSON.stringify(optimizedData).length / 1024;
 
-  try {
-    const { error } = await supabase
-      .from('app_state')
-      .upsert({ 
-        id: 'main_storage', 
-        data: optimizedData,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
+    if (sizeKb > MAX_PAYLOAD_KB) {
+      console.error(`Sync Blocked: Payload ${sizeKb.toFixed(1)}KB is too large for the safety limit.`);
+      return;
+    }
 
-    if (error) throw error;
-  } catch (err) {
-    console.warn('Sync failed:', err);
-  }
+    try {
+      const { error } = await supabase
+        .from('app_state')
+        .upsert({ 
+          id: 'main_storage', 
+          data: optimizedData,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+
+      if (error) throw error;
+      console.log(`[NETLIFY SHIELD] Cloud Sync Optimized: ${sizeKb.toFixed(1)}KB`);
+    } catch (err) {
+      console.warn('Sync failed:', err);
+    }
+  }, 3000); // 3-second debounce to batch changes
 };
 
 export const fetchAppStateFromCloud = async (): Promise<Partial<AppState> | null> => {
