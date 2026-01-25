@@ -93,78 +93,35 @@ const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-malawi-green font-black uppercase tracking-[0.4em] text-[10px] mb-2">Our Foundation</p>
-            <h2 className="text-4xl font-black uppercase tracking-tight text-malawi-black">Why KPH <span className="text-malawi-red">Transform</span>?</h2>
-            <p className="text-gray-500 mt-4 max-w-2xl mx-auto font-medium">Providing the most reliable affiliate experience in Malawi with local payment integrations.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-12 rounded-[3.5rem] bg-gray-50 border border-gray-100 space-y-6 hover:shadow-xl transition-all hover:bg-white group">
-              <div className="w-16 h-16 bg-malawi-green/10 text-malawi-green rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Wallet size={32} />
-              </div>
-              <h3 className="text-2xl font-black uppercase tracking-tight">Fast Payouts</h3>
-              <p className="text-gray-500 leading-relaxed">Withdraw your earnings directly to your mobile wallet within hours. We prioritize your financial liquidity.</p>
-            </div>
-            <div className="p-12 rounded-[3.5rem] bg-gray-50 border border-gray-100 space-y-6 hover:shadow-xl transition-all hover:bg-white group">
-              <div className="w-16 h-16 bg-malawi-red/10 text-malawi-red rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <TrendingUp size={32} />
-              </div>
-              <h3 className="text-2xl font-black uppercase tracking-tight">Multi-Level</h3>
-              <p className="text-gray-500 leading-relaxed">Earn consistent commissions from your direct and indirect network. Build a legacy of passive income.</p>
-            </div>
-            <div className="p-12 rounded-[3.5rem] bg-gray-50 border border-gray-100 space-y-6 hover:shadow-xl transition-all hover:bg-white group">
-              <div className="w-16 h-16 bg-malawi-black/10 text-malawi-black rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <ShieldCheck size={32} />
-              </div>
-              <h3 className="text-2xl font-black uppercase tracking-tight">Malawi Standard</h3>
-              <p className="text-gray-500 leading-relaxed">A robust platform built by local experts, ensuring security and cultural relevance in every transaction.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Membership Tiers Preview Section */}
       <section className="py-24 px-6 bg-gray-50 border-y border-gray-200">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-black uppercase tracking-tight text-malawi-black">Select Your Membership</h2>
-            <p className="text-gray-500 mt-4 font-medium italic">Earning potential increases with every tier.</p>
+            <h2 className="text-4xl font-black uppercase tracking-tight text-malawi-black">Membership Tiers</h2>
+            <p className="text-gray-500 mt-4 font-medium italic">High commissions attached to every level of participation.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {MEMBERSHIP_TIERS.map(tier => (
               <div key={tier.tier} className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-2xl transition-all group flex flex-col h-full relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 opacity-5" style={{ backgroundColor: tier.color }}></div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: tier.color }}>{tier.name} LEVEL</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: tier.color }}>{tier.name} ACCESS</p>
                 <h4 className="text-4xl font-black mb-1 text-malawi-black">K{tier.price.toLocaleString()}</h4>
-                <div className="flex items-center gap-2 mb-6">
-                  <span className="bg-malawi-green text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{tier.directCommission}% Direct</span>
-                  <span className="bg-malawi-red text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{tier.indirectCommission}% Indirect</span>
+                <div className="flex flex-col gap-2 mt-4 mb-6">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-malawi-green text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{tier.directCommission}% Direct</span>
+                    <span className="bg-malawi-red text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{tier.indirectCommission}% Indirect</span>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-500 mb-8 flex-grow leading-relaxed">{tier.description}</p>
-                <div className="flex items-center gap-3 text-malawi-green font-black text-[10px] uppercase tracking-widest pt-6 border-t border-gray-50">
-                  <CheckCircle size={18} /> High-Yield Profits
-                </div>
+                <button 
+                  onClick={() => navigate('/auth?type=signup')}
+                  className="w-full py-4 bg-malawi-black text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-malawi-green transition-all"
+                >
+                  Get Started
+                </button>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-24 px-6 bg-malawi-black text-white text-center relative overflow-hidden">
-        <div className="max-w-3xl mx-auto relative z-10 space-y-10">
-           <h2 className="text-5xl md:text-6xl font-black uppercase tracking-tighter leading-none">Ready to start <span className="text-malawi-green">transforming</span> your life?</h2>
-           <p className="text-gray-400 text-xl">Join thousands of Malawian affiliates today.</p>
-           <button 
-             onClick={() => navigate('/auth?type=signup')}
-             className="bg-malawi-red hover:bg-red-700 text-white font-black py-6 px-16 rounded-full text-xl uppercase tracking-widest transition-all shadow-[0_20px_60px_rgba(210,16,52,0.3)] hover:scale-105"
-           >
-              Create Free Account
-           </button>
         </div>
       </section>
     </div>

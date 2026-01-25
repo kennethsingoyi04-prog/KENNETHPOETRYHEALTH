@@ -4,7 +4,7 @@ import { MembershipTier } from './types';
 export const MIN_WITHDRAWAL = 5000; // 5000 MWK
 export const LEVEL_1_COMMISSION_PERCENT = 10;
 export const LEVEL_2_COMMISSION_PERCENT = 5;
-export const SIGNUP_BONUS = 1000; // Small incentive
+export const SIGNUP_BONUS = 0; // No signup bonus - strictly work-based
 
 export const MALAWI_COLORS = {
   green: '#118131',
@@ -18,8 +18,8 @@ export interface MembershipConfig {
   price: number;
   color: string;
   description: string;
-  directCommission: number; // L1 %
-  indirectCommission: number; // L2 %
+  directCommission: number; // L1 % (Requested 30% - 40%)
+  indirectCommission: number; // L2 % (Requested flat 5%)
 }
 
 export const MEMBERSHIP_TIERS: MembershipConfig[] = [
@@ -28,7 +28,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Bronze',
     price: 2000,
     color: '#cd7f32',
-    description: 'Entry level membership with basic referral access.',
+    description: 'Entry tier. 30% profit on direct referrals.',
     directCommission: 30,
     indirectCommission: 5
   },
@@ -37,7 +37,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Platinum',
     price: 5000,
     color: '#e5e4e2',
-    description: 'Enhanced tier for consistent affiliates.',
+    description: 'Value tier. 32% profit on direct referrals.',
     directCommission: 32,
     indirectCommission: 5
   },
@@ -46,7 +46,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Silver',
     price: 10000,
     color: '#c0c0c0',
-    description: 'Professional tier with priority support.',
+    description: 'Pro tier. 34% profit on direct referrals.',
     directCommission: 34,
     indirectCommission: 5
   },
@@ -55,7 +55,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Copper',
     price: 15000,
     color: '#b87333',
-    description: 'Exclusive tier with higher earning potential.',
+    description: 'Expert tier. 36% profit on direct referrals.',
     directCommission: 36,
     indirectCommission: 5
   },
@@ -64,7 +64,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Aluminium',
     price: 20000,
     color: '#d1d1d1',
-    description: 'Premium tier for network leaders.',
+    description: 'Master tier. 38% profit on direct referrals.',
     directCommission: 38,
     indirectCommission: 5
   },
@@ -73,7 +73,7 @@ export const MEMBERSHIP_TIERS: MembershipConfig[] = [
     name: 'Gold',
     price: 25000,
     color: '#ffd700',
-    description: 'Elite membership with maximum platform benefits.',
+    description: 'Elite tier. Maximum 40% profit on direct referrals.',
     directCommission: 40,
     indirectCommission: 5
   }
