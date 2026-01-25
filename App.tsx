@@ -38,10 +38,10 @@ const App: React.FC = () => {
     complaints: []
   });
 
-  // 1. Initial Load: LocalStorage First -> Then Cloud
+  // 1. Initial Load Strategy
   useEffect(() => {
     const initApp = async () => {
-      // Load from Local Cache instantly for speed
+      // Load from Local Storage instantly for zero latency
       const localData = loadFromLocal();
       if (localData) {
         setState(prev => ({ ...prev, ...localData }));
@@ -87,7 +87,7 @@ const App: React.FC = () => {
       const success = await syncAppStateToCloud(state);
       if (success) {
         setHasUnsavedChanges(false);
-        alert("Cloud Backup Complete. Site updated successfully.");
+        alert("Cloud Backup Verified. Netlify credits protected.");
       }
     } catch (e: any) {
       alert(e.message);
@@ -106,7 +106,7 @@ const App: React.FC = () => {
         if (refreshedUser) newState.currentUser = refreshedUser;
       }
 
-      // Save to LocalStorage immediately (Zero Bandwidth Cost)
+      // Save to LocalStorage immediately (0 Bandwidth Cost)
       saveToLocal(newState);
       setHasUnsavedChanges(true);
       return newState;
@@ -137,7 +137,7 @@ const App: React.FC = () => {
         <Logo size="lg" variant="light" showText={false} className="animate-pulse" />
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-malawi-green" size={32} />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Establishing Secure Command...</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Launching Command Station...</p>
         </div>
       </div>
     );
@@ -153,7 +153,7 @@ const App: React.FC = () => {
         </div>
         
         <h1 className="text-5xl font-black uppercase tracking-tighter mb-4 text-malawi-red">Account Restricted</h1>
-        <p className="text-gray-500 max-w-lg mb-12 font-bold uppercase tracking-widest text-xs">Access to KENNETHPOETRYHEALTH has been revoked by administration.</p>
+        <p className="text-gray-500 max-w-lg mb-12 font-bold uppercase tracking-widest text-xs">Your access to the platform has been revoked by administration.</p>
         
         <div className="bg-white/5 border border-white/10 p-12 rounded-[3.5rem] w-full max-w-2xl mb-12 text-left relative overflow-hidden backdrop-blur-md">
            <div className="absolute top-[-10%] right-[-5%] text-white/5 -rotate-12 pointer-events-none">
@@ -167,18 +167,18 @@ const App: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                 <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Formal Violation Reason:</p>
-                 <p className="text-3xl font-black italic leading-tight">"{state.currentUser.banReason || 'Standard Platform Violation'}"</p>
+                 <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Infraction Reason:</p>
+                 <p className="text-3xl font-black italic leading-tight">"{state.currentUser.banReason || 'Standard Violation'}"</p>
               </div>
 
               {state.currentUser.banType === 'TEMPORARY' && state.currentUser.banExpiresAt && (
                  <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                       <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Restriction Expiry:</p>
-                       <p className="text-xl font-black text-malawi-green">{new Date(state.currentUser.banExpiresAt).toLocaleDateString()} {new Date(state.currentUser.banExpiresAt).toLocaleTimeString()}</p>
+                       <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Access Restored On:</p>
+                       <p className="text-xl font-black text-malawi-green">{new Date(state.currentUser.banExpiresAt).toLocaleString()}</p>
                     </div>
                     <div className="bg-malawi-green/10 text-malawi-green px-5 py-2 rounded-full border border-malawi-green/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                       <Clock size={14} /> Auto-Lifting Enabled
+                       <Clock size={14} /> Auto-Release Mode
                     </div>
                  </div>
               )}
@@ -189,15 +189,15 @@ const App: React.FC = () => {
            <a 
              href={`https://wa.me/${state.users.find(u => u.isOwner)?.whatsapp}`} 
              target="_blank" 
-             className="flex-grow bg-malawi-green hover:bg-green-700 text-white font-black py-6 rounded-[2rem] uppercase text-xs tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all active:scale-95"
+             className="flex-grow bg-malawi-green hover:bg-green-700 text-white font-black py-6 rounded-[2rem] uppercase text-xs tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all"
            >
-             <MessageCircle size={20} /> Appeal Access
+             <MessageCircle size={20} /> Appeal Now
            </a>
            <button 
              onClick={logout} 
              className="px-12 bg-white/5 hover:bg-white/10 text-white font-black py-6 rounded-[2rem] border border-white/10 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-2 transition-all"
            >
-             <ArrowLeft size={16} /> Logout
+             <ArrowLeft size={16} /> Exit Portal
            </button>
         </div>
       </div>

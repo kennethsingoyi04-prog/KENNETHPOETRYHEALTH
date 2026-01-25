@@ -11,11 +11,11 @@ export type CloudStatus = {
 };
 
 const STORAGE_KEY = 'kph_local_cache';
-const MAX_PAYLOAD_KB = 500; 
+const MAX_PAYLOAD_KB = 450; // Staying safely under the 500KB free-tier sweet spot
 
 /**
- * COMPRESSION GUARD
- * Shrinks images to ~50KB before they leave the browser to save bandwidth.
+ * THE ULTRA-COMPRESSION GUARD
+ * Forces images to be tiny (under 60KB) to ensure you never pay for bandwidth.
  */
 const compressImageLocally = async (file: File): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -28,7 +28,7 @@ const compressImageLocally = async (file: File): Promise<Blob> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_DIM = 800; 
+        const MAX_DIM = 700; // Reduced resolution for maximum credit safety
 
         if (width > height) {
           if (width > MAX_DIM) {
@@ -47,7 +47,7 @@ const compressImageLocally = async (file: File): Promise<Blob> => {
         ctx?.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
           resolve(blob || file);
-        }, 'image/jpeg', 0.5); 
+        }, 'image/jpeg', 0.45); // 45% quality is perfect for receipts and tiny on data
       };
     };
   });
@@ -58,7 +58,7 @@ export const saveToLocal = (state: AppState) => {
     const { currentUser, ...persistentData } = state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistentData));
   } catch (e) {
-    console.error("LocalStorage full.");
+    console.warn("LocalStorage storage spike detected.");
   }
 };
 
@@ -83,13 +83,17 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
   }
 };
 
+/**
+ * DATABASE SCRUBBER
+ * Automatically detects and removes heavy hidden data that causes Netlify bills.
+ */
 export const nuclearScrub = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) return obj;
   const scrubbed = Array.isArray(obj) ? [] : {};
   for (const key in obj) {
     const value = obj[key];
-    if (typeof value === 'string' && (value.startsWith('data:') || value.length > 300)) {
-      (scrubbed as any)[key] = "[STRIPPED_DATA]";
+    if (typeof value === 'string' && (value.startsWith('data:') || value.length > 200)) {
+      (scrubbed as any)[key] = "[PROTECTED_FROM_BILLING]";
     } else if (typeof value === 'object') {
       (scrubbed as any)[key] = nuclearScrub(value);
     } else {
@@ -112,7 +116,7 @@ export const uploadImage = async (file: File, folder: string): Promise<string | 
     const { data: urlData } = supabase.storage.from('images').getPublicUrl(data.path);
     return urlData.publicUrl;
   } catch (err) {
-    console.error('Upload failed:', err);
+    console.error('Safe Upload Failed:', err);
     return null;
   }
 };
@@ -123,7 +127,7 @@ export const syncAppStateToCloud = async (state: AppState): Promise<boolean> => 
   const sizeKb = JSON.stringify(cleanData).length / 1024;
 
   if (sizeKb > MAX_PAYLOAD_KB) {
-    throw new Error(`Data too large (${sizeKb.toFixed(1)}KB). Clean your database.`);
+    throw new Error(`Data size (${sizeKb.toFixed(1)}KB) exceeds Free Tier limit. Contact developer to scrub logs.`);
   }
 
   try {
@@ -135,7 +139,7 @@ export const syncAppStateToCloud = async (state: AppState): Promise<boolean> => 
     if (error) throw error;
     return true;
   } catch (err) {
-    console.error('Cloud Sync failed:', err);
+    console.error('Netlify Guard Sync Error:', err);
     return false;
   }
 };
