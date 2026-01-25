@@ -20,7 +20,10 @@ import {
   CheckCircle,
   AlertCircle,
   MapPin,
-  Send
+  Send,
+  Mail,
+  Locate,
+  Info
 } from 'lucide-react';
 import { uploadImage } from '../dataService';
 
@@ -44,7 +47,9 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
     fullName: user.fullName,
     phone: user.phone,
     whatsapp: user.whatsapp,
-    email: user.email
+    email: user.email,
+    location: user.location || '',
+    bio: user.bio || ''
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -69,7 +74,9 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
       fullName: user.fullName,
       phone: user.phone,
       whatsapp: user.whatsapp,
-      email: user.email
+      email: user.email,
+      location: user.location || '',
+      bio: user.bio || ''
     });
   }, [user, isEditing]);
 
@@ -87,12 +94,15 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
         fullName: editFormData.fullName,
         phone: editFormData.phone,
         whatsapp: editFormData.whatsapp,
-        email: editFormData.email
+        email: editFormData.email,
+        location: editFormData.location,
+        bio: editFormData.bio
       };
       const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
       onStateUpdate({ users: updatedUsers, currentUser: updatedUser });
       setIsSavingProfile(false);
       setIsEditing(false);
+      alert("Profile updated successfully!");
     }, 800);
   };
 
@@ -139,15 +149,6 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
     }, 1000);
   };
 
-  const handleSupportImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploading(true);
-    const url = await uploadImage(file, 'support_tickets');
-    if (url) setSupportImageUrl(url);
-    setIsUploading(false);
-  };
-
   return (
     <div className="max-w-5xl mx-auto pb-12 animate-in fade-in duration-500">
       {viewingProofUrl && (
@@ -184,7 +185,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                      <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-green hover:underline"><Edit3 size={14} /> Edit Profile</button>
                    ) : (
                      <div className="flex gap-4">
-                        <button onClick={handleProfileSave} disabled={isSavingProfile} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-green hover:underline disabled:opacity-50">{isSavingProfile ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save</button>
+                        <button onClick={handleProfileSave} disabled={isSavingProfile} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-green hover:underline disabled:opacity-50">{isSavingProfile ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Changes</button>
                         <button onClick={() => setIsEditing(false)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-red hover:underline"><X size={14} /> Cancel</button>
                      </div>
                    )}
@@ -193,30 +194,70 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                 <div className="space-y-6">
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-1">
-                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Name</label>
+                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Legal Name</label>
                          {isEditing ? (
-                           <input type="text" className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm uppercase outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.fullName} onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}/>
-                         ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm uppercase">{user.fullName}</p>}
+                           <div className="relative">
+                             <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                             <input type="text" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm uppercase outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.fullName} onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}/>
+                           </div>
+                         ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm uppercase flex items-center gap-3"><UserIcon size={16} className="text-gray-300"/>{user.fullName}</p>}
                       </div>
                       <div className="space-y-1">
-                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Affiliate Code</label>
-                         <p className="p-4 bg-gray-100 rounded-2xl border font-mono font-black text-sm text-gray-400 select-none">{user.referralCode}</p>
+                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Official Email</label>
+                         {isEditing ? (
+                           <div className="relative">
+                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                             <input type="email" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.email} onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}/>
+                           </div>
+                         ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Mail size={16} className="text-gray-300"/>{user.email}</p>}
                       </div>
                    </div>
                    
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Phone Number</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Primary Phone</label>
                         {isEditing ? (
-                          <input type="tel" className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}/>
-                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.phone}</p>}
+                          <div className="relative">
+                            <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                            <input type="tel" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}/>
+                          </div>
+                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Smartphone size={16} className="text-gray-300"/>{user.phone}</p>}
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">WhatsApp Number</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">WhatsApp Contact</label>
                         {isEditing ? (
-                          <input type="tel" className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.whatsapp} onChange={(e) => setEditFormData({...editFormData, whatsapp: e.target.value})}/>
-                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.whatsapp || 'Not set'}</p>}
+                          <div className="relative">
+                            <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-malawi-green" size={16}/>
+                            <input type="tel" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.whatsapp} onChange={(e) => setEditFormData({...editFormData, whatsapp: e.target.value})}/>
+                          </div>
+                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Smartphone size={16} className="text-malawi-green"/>{user.whatsapp || 'Not set'}</p>}
                       </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Current Location</label>
+                        {isEditing ? (
+                          <div className="relative">
+                            <Locate className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                            <input type="text" className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" value={editFormData.location} onChange={(e) => setEditFormData({...editFormData, location: e.target.value})} placeholder="District / City"/>
+                          </div>
+                        ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm flex items-center gap-3"><Locate size={16} className="text-gray-300"/>{user.location || 'Not specified'}</p>}
+                      </div>
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Affiliate Code</label>
+                         <p className="p-4 bg-gray-100 rounded-2xl border font-mono font-black text-sm text-gray-400 select-none flex items-center gap-3"><ShieldCheck size={16}/>{user.referralCode}</p>
+                      </div>
+                   </div>
+
+                   <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Short Bio</label>
+                      {isEditing ? (
+                        <div className="relative">
+                          <Info className="absolute left-4 top-4 text-gray-300" size={16}/>
+                          <textarea rows={3} className="w-full pl-12 pr-4 py-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green resize-none" value={editFormData.bio} onChange={(e) => setEditFormData({...editFormData, bio: e.target.value})} placeholder="Tell others about your marketing goals..."/>
+                        </div>
+                      ) : <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm italic">{user.bio || 'No bio yet.'}</p>}
                    </div>
                 </div>
               </div>
@@ -295,6 +336,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                 </div>
                 {showSupportForm ? (
                   <form onSubmit={handleSupportSubmit} className="space-y-4 animate-in slide-in-from-top-4">
+                    {/* // Fixed: Changed setSubject to setSupportSubject */}
                     <input type="text" required placeholder="Ticket Subject" className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-black" value={supportSubject} onChange={e => setSupportSubject(e.target.value)} />
                     <textarea rows={6} required placeholder="Detail message..." className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium resize-none outline-none focus:ring-2 focus:ring-malawi-black" value={supportMessage} onChange={e => setSupportMessage(e.target.value)} />
                     <button type="submit" disabled={isSubmittingSupport || isUploading} className="w-full bg-malawi-black text-white font-black py-4 rounded-3xl uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50">

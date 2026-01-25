@@ -81,14 +81,13 @@ export const checkCloudHealth = async (): Promise<CloudStatus> => {
 
 /**
  * DATABASE SCRUBBER
- * Relaxed limit to ensure user addresses and long emails aren't lost.
+ * Relaxed limit to 10k characters to ensure user addresses and long bios aren't lost.
  */
 export const nuclearScrub = (obj: any): any => {
   if (typeof obj !== 'object' || obj === null) return obj;
   const scrubbed = Array.isArray(obj) ? [] : {};
   for (const key in obj) {
     const value = obj[key];
-    // Limit increased from 200 to 10,000 to protect data integrity
     if (typeof value === 'string' && (value.startsWith('data:') || value.length > 10000)) {
       (scrubbed as any)[key] = "[PROTECTED_FROM_BILLING]";
     } else if (typeof value === 'object') {
