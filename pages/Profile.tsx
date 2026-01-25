@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AppState, Complaint } from '../types';
+import { AppState, Complaint, User } from '../types';
 import { 
   X, 
   ChevronRight, 
@@ -12,7 +12,10 @@ import {
   Loader2,
   Eye,
   MessageSquareWarning,
-  Smartphone
+  Smartphone,
+  Edit3,
+  Save,
+  User as UserIcon
 } from 'lucide-react';
 import { uploadImage } from '../dataService';
 
@@ -30,6 +33,17 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   const user = state.currentUser!;
   const [activeTab, setActiveTab] = useState<ProfileTab>((searchParams.get('tab') as ProfileTab) || 'account');
 
+  // Account Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    fullName: user.fullName,
+    phone: user.phone,
+    whatsapp: user.whatsapp,
+    email: user.email
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Support Ticket States
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [supportSubject, setSupportSubject] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
@@ -38,6 +52,16 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [showSupportForm, setShowSupportForm] = useState(false);
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
+
+  // Reset edit form when user changes or edit mode toggles
+  useEffect(() => {
+    setEditFormData({
+      fullName: user.fullName,
+      phone: user.phone,
+      whatsapp: user.whatsapp,
+      email: user.email
+    });
+  }, [user, isEditing]);
 
   const myComplaints = useMemo(() => {
     return state.complaints
@@ -58,6 +82,31 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
     const url = await uploadImage(file, 'support_tickets');
     if (url) setSupportImageUrl(url);
     setIsUploading(false);
+  };
+
+  const handleProfileSave = () => {
+    setIsSavingProfile(true);
+    
+    // Simulate API delay
+    setTimeout(() => {
+      const updatedUser: User = {
+        ...user,
+        fullName: editFormData.fullName,
+        phone: editFormData.phone,
+        whatsapp: editFormData.whatsapp,
+        email: editFormData.email
+      };
+
+      const updatedUsers = state.users.map(u => u.id === user.id ? updatedUser : u);
+      
+      onStateUpdate({
+        users: updatedUsers,
+        currentUser: updatedUser
+      });
+
+      setIsSavingProfile(false);
+      setIsEditing(false);
+    }, 800);
   };
 
   const handleSupportSubmit = (e: React.FormEvent) => {
@@ -117,29 +166,110 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
           <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-gray-100 min-h-[600px]">
             {activeTab === 'account' && (
               <div className="space-y-8 animate-in fade-in duration-300">
-                <div className="border-b pb-6">
+                <div className="border-b pb-6 flex justify-between items-center">
                    <h3 className="text-xl font-black uppercase tracking-tight">Personal Information</h3>
+                   {!isEditing ? (
+                     <button 
+                       onClick={() => setIsEditing(true)}
+                       className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-green hover:underline"
+                     >
+                       <Edit3 size={14} /> Edit Profile
+                     </button>
+                   ) : (
+                     <div className="flex gap-4">
+                        <button 
+                          onClick={handleProfileSave}
+                          disabled={isSavingProfile}
+                          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-green hover:underline disabled:opacity-50"
+                        >
+                          {isSavingProfile ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+                        </button>
+                        <button 
+                          onClick={() => setIsEditing(false)}
+                          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-malawi-red hover:underline"
+                        >
+                          <X size={14} /> Cancel
+                        </button>
+                     </div>
+                   )}
                 </div>
+                
                 <div className="space-y-6">
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-1">
                          <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Name</label>
-                         <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm uppercase">{user.fullName}</p>
+                         {isEditing ? (
+                           <input 
+                             type="text" 
+                             className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm uppercase outline-none focus:ring-2 focus:ring-malawi-green" 
+                             value={editFormData.fullName}
+                             onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}
+                           />
+                         ) : (
+                           <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm uppercase">{user.fullName}</p>
+                         )}
                       </div>
                       <div className="space-y-1">
                          <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Affiliate Code</label>
-                         <p className="p-4 bg-gray-50 rounded-2xl border font-mono font-black text-sm text-malawi-green">{user.referralCode}</p>
+                         <p className="p-4 bg-gray-100 rounded-2xl border font-mono font-black text-sm text-gray-400 select-none">{user.referralCode}</p>
                       </div>
                    </div>
-                   <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Linked Phone</label>
-                      <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.phone}</p>
+                   
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Phone Number</label>
+                        {isEditing ? (
+                          <input 
+                            type="tel" 
+                            className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" 
+                            value={editFormData.phone}
+                            onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                          />
+                        ) : (
+                          <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.phone}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">WhatsApp Number</label>
+                        {isEditing ? (
+                          <input 
+                            type="tel" 
+                            className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" 
+                            value={editFormData.whatsapp}
+                            onChange={(e) => setEditFormData({...editFormData, whatsapp: e.target.value})}
+                          />
+                        ) : (
+                          <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.whatsapp || 'Not set'}</p>
+                        )}
+                      </div>
                    </div>
+
                    <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Email Address</label>
-                      <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.email}</p>
+                      {isEditing ? (
+                        <input 
+                          type="email" 
+                          className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-green" 
+                          value={editFormData.email}
+                          onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                        />
+                      ) : (
+                        <p className="p-4 bg-gray-50 rounded-2xl border font-bold text-sm">{user.email}</p>
+                      )}
                    </div>
                 </div>
+
+                {isEditing && (
+                  <div className="pt-4 border-t">
+                    <button 
+                      onClick={handleProfileSave}
+                      disabled={isSavingProfile}
+                      className="w-full py-5 bg-malawi-green text-white font-black rounded-2xl uppercase text-[10px] tracking-[0.2em] shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {isSavingProfile ? <Loader2 size={16} className="animate-spin" /> : 'Confirm Profile Changes'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -217,7 +347,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                           <h5 className="font-black text-sm uppercase tracking-tight text-malawi-black mb-1">{ticket.subject}</h5>
                           <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{new Date(ticket.createdAt).toLocaleDateString()} • Ticket {ticket.id}</p>
                         </div>
-                        <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${ticket.status === 'PENDING' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>{ticket.status}</span>
+                        <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${ticket.status === 'PENDING' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}>{ticket.status}</span>
                       </button>
                     ))}
                   </div>
