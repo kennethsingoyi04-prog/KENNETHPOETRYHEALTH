@@ -27,7 +27,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
   const handleManualSync = async () => {
     setIsChecking(true);
-    try { await syncAppStateToCloud(state); alert("Backup successful."); } 
+    try { await syncAppStateToCloud(state); alert("System Backup successful."); } 
     catch (e: any) { alert(e.message); } 
     finally { setIsChecking(false); }
   };
@@ -81,6 +81,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
   const handleBanUser = () => {
     if (!inspectingUser) return;
+    if (inspectingUser.role === 'ADMIN' && state.currentUser?.username !== 'admin') {
+      alert("Only the Main Owner can discipline other administrators.");
+      return;
+    }
     if (!banReason.trim()) {
       alert("Please provide a reason for the disciplinary action.");
       return;
@@ -357,7 +361,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                             <div className="w-16 h-16 bg-malawi-red text-white rounded-2xl flex items-center justify-center font-black text-xl">{u.fullName.charAt(0)}</div>
                             <div>
                                <h4 className="font-black text-lg uppercase tracking-tight">{u.bookSellerFullName || u.fullName}</h4>
-                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Seller Application Request</p>
+                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Book Distributor Request</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -408,7 +412,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                           </td>
                           <td className="px-10 py-8"><span className="px-3 py-1 bg-gray-100 rounded text-[9px] font-black uppercase">{u.membershipTier}</span></td>
                           <td className="px-10 py-8 font-black text-malawi-green">K{u.balance.toLocaleString()}</td>
-                          <td className="px-10 py-8 text-center"><button onClick={() => setInspectingUser(u)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md">Inspect Account</button></td>
+                          <td className="px-10 py-8 text-center"><button onClick={() => setInspectingUser(u)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-malawi-green transition-colors">Inspect Account</button></td>
                        </tr>
                     ))}
                  </tbody>

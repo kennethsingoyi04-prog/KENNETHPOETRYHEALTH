@@ -336,7 +336,6 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                 </div>
                 {showSupportForm ? (
                   <form onSubmit={handleSupportSubmit} className="space-y-4 animate-in slide-in-from-top-4">
-                    {/* // Fixed: Changed setSubject to setSupportSubject */}
                     <input type="text" required placeholder="Ticket Subject" className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-malawi-black" value={supportSubject} onChange={e => setSupportSubject(e.target.value)} />
                     <textarea rows={6} required placeholder="Detail message..." className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium resize-none outline-none focus:ring-2 focus:ring-malawi-black" value={supportMessage} onChange={e => setSupportMessage(e.target.value)} />
                     <button type="submit" disabled={isSubmittingSupport || isUploading} className="w-full bg-malawi-black text-white font-black py-4 rounded-3xl uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50">

@@ -45,7 +45,14 @@ const App: React.FC = () => {
     if (cloudData) {
       const savedUid = localStorage.getItem(SESSION_KEY);
       const cloudUsers = cloudData.users || [];
+      
+      // Look for current user in cloud data
       let sessionUser = savedUid ? cloudUsers.find(u => u.id === savedUid) : null;
+      
+      // Fallback: Check if we have a cached current user in local state that matches a cloud user by username
+      if (!sessionUser && state.currentUser) {
+        sessionUser = cloudUsers.find(u => u.username === state.currentUser?.username);
+      }
       
       // Auto-Expiry for Temporary Bans
       if (sessionUser?.isBanned && sessionUser.banType === 'TEMPORARY' && sessionUser.banExpiresAt) {
@@ -59,22 +66,31 @@ const App: React.FC = () => {
         ...cloudData,
         currentUser: sessionUser || prev.currentUser
       }));
+      
+      // Re-save session ID if we found a user
+      if (sessionUser) {
+        localStorage.setItem(SESSION_KEY, sessionUser.id);
+      }
     }
   };
 
   useEffect(() => {
     const initApp = async () => {
+      // 1. Load from local first for instant UI
       const localData = loadFromLocal();
       if (localData) {
         setState(prev => ({ ...prev, ...localData }));
       }
 
+      // 2. Check cloud connectivity
       const health = await checkCloudHealth();
       setIsOnline(health.ok);
 
+      // 3. Fetch latest from cloud
       if (health.ok) {
         await fetchAndMergeCloudState();
       }
+      
       setIsReady(true);
     };
 
