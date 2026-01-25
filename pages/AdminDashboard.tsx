@@ -19,8 +19,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   const [isChecking, setIsChecking] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [inspectingUser, setInspectingUser] = useState<User | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const [activeComplaint, setActiveComplaint] = useState<Complaint | null>(null);
   const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
 
   const handleManualSync = async () => {
@@ -34,8 +32,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     const targetUser = state.users.find(u => u.id === targetId);
     if (!targetUser) return;
 
-    const tierConfig = MEMBERSHIP_TIERS.find(t => t.tier === targetUser.membershipTier);
-    if (!tierConfig) return;
+    // The tier being bought by the new user
+    const tierBeingBought = MEMBERSHIP_TIERS.find(t => t.tier === targetUser.membershipTier);
+    if (!tierBeingBought) return;
 
     let updatedUsers = [...state.users];
     let updatedReferrals = [...state.referrals];
@@ -43,12 +42,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     // 1. Activate User
     updatedUsers = updatedUsers.map(u => u.id === targetId ? { ...u, membershipStatus: MembershipStatus.ACTIVE } : u);
 
-    // 2. Direct Referral Commission
+    // 2. Direct Referral Commission (L1)
     if (targetUser.referredBy) {
       const l1Referrer = updatedUsers.find(u => u.id === targetUser.referredBy);
       if (l1Referrer) {
+        // L1 commission rate is based on the L1 Referrer's Membership Tier (30% to 40%)
         const l1TierConfig = MEMBERSHIP_TIERS.find(t => t.tier === l1Referrer.membershipTier) || MEMBERSHIP_TIERS[0];
-        const commission = (tierConfig.price * l1TierConfig.directCommission) / 100;
+        const commission = (tierBeingBought.price * l1TierConfig.directCommission) / 100;
         
         updatedReferrals.push({
           id: `ref-${Date.now()}-L1`,
@@ -65,11 +65,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
           totalEarnings: u.totalEarnings + commission
         } : u);
 
-        // 3. Indirect Referral Commission (Fixed 5%)
+        // 3. Indirect Referral Commission (L2) - Strictly 5% from Team
         if (l1Referrer.referredBy) {
           const l2Referrer = updatedUsers.find(u => u.id === l1Referrer.referredBy);
           if (l2Referrer) {
-            const l2Commission = (tierConfig.price * 5) / 100;
+            const l2Commission = (tierBeingBought.price * 5) / 100;
             
             updatedReferrals.push({
               id: `ref-${Date.now()}-L2`,
@@ -91,7 +91,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     }
 
     onStateUpdate({ users: updatedUsers, referrals: updatedReferrals });
-    alert(`Account for ${targetUser.fullName} is now ACTIVE. Commissions distributed.`);
+    alert(`Activation Successful: Commission distributed to the upline.`);
   };
 
   const pendingActivations = useMemo(() => {
@@ -124,12 +124,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
               <div className="p-10 overflow-y-auto space-y-6">
                  <div className="bg-gray-50 p-8 rounded-[3rem] border grid grid-cols-2 gap-4">
                     <div>
-                       <p className="text-[10px] font-black uppercase text-gray-400">Balance</p>
+                       <p className="text-[10px] font-black uppercase text-gray-400">Current MWK Balance</p>
                        <p className="text-2xl font-black text-malawi-green">K{inspectingUser.balance.toLocaleString()}</p>
                     </div>
                     <div>
-                       <p className="text-[10px] font-black uppercase text-gray-400">Status</p>
-                       <p className="text-sm font-black uppercase">{inspectingUser.membershipStatus}</p>
+                       <p className="text-[10px] font-black uppercase text-gray-400">Membership Tier</p>
+                       <p className="text-sm font-black uppercase">{inspectingUser.membershipTier}</p>
                     </div>
                  </div>
               </div>
@@ -149,7 +149,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         <div className="flex items-center gap-4">
           <div className="relative">
              <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-             <input type="text" placeholder="Search..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+             <input type="text" placeholder="Find user..." className="pl-14 pr-8 py-5 bg-white border rounded-[2rem] w-64 shadow-sm" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
           </div>
           <button onClick={handleManualSync} className="p-5 bg-white border rounded-[1.5rem] shadow-sm active:scale-95 transition-all"><RefreshCw size={24} className={isChecking ? 'animate-spin' : ''} /></button>
         </div>
@@ -182,14 +182,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                           <div className="w-16 h-16 bg-malawi-green text-white rounded-2xl flex items-center justify-center font-black text-xl">{u.fullName.charAt(0)}</div>
                           <div>
                              <h4 className="font-black text-lg uppercase tracking-tight">{u.fullName}</h4>
-                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Requested Tier: {u.membershipTier}</p>
+                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Applying for: {u.membershipTier}</p>
                           </div>
                        </div>
                        <div className="flex items-center gap-4">
                           {u.membershipProofUrl && (
                              <button onClick={() => setViewingProofUrl(u.membershipProofUrl!)} className="p-4 bg-gray-100 rounded-xl text-gray-400 hover:text-malawi-black transition-colors"><ImageIcon size={20}/></button>
                           )}
-                          <button onClick={() => approveMembership(u.id)} className="px-8 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2"><CheckCircle2 size={16}/> Approve & Credit</button>
+                          <button onClick={() => approveMembership(u.id)} className="px-8 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 transition-all active:scale-95"><CheckCircle2 size={16}/> Approve & Send Commission</button>
                        </div>
                     </div>
                  ))
@@ -209,7 +209,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                           <td className="px-10 py-8"><p className="font-black uppercase tracking-tight">{u.fullName}</p><p className="text-[10px] text-gray-400">@{u.username}</p></td>
                           <td className="px-10 py-8"><span className="px-3 py-1 bg-gray-100 rounded text-[9px] font-black uppercase">{u.membershipTier}</span></td>
                           <td className="px-10 py-8 font-black text-malawi-green">K{u.balance.toLocaleString()}</td>
-                          <td className="px-10 py-8 text-center"><button onClick={() => setInspectingUser(u)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md">Inspect</button></td>
+                          <td className="px-10 py-8 text-center"><button onClick={() => setInspectingUser(u)} className="px-8 py-3 bg-malawi-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md">Inspect Account</button></td>
                        </tr>
                     ))}
                  </tbody>
