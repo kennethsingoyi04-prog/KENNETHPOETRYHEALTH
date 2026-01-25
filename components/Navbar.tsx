@@ -11,9 +11,6 @@ import {
   ShieldCheck,
   User as UserIcon,
   MessageSquareWarning,
-  Zap,
-  ChevronRight,
-  ImageIcon,
   Cloud,
   RefreshCw,
   Save
@@ -54,7 +51,7 @@ const Navbar: React.FC<NavbarProps> = ({
     >
       {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : 
        hasUnsavedChanges ? <Save size={14} /> : <Cloud size={14} />}
-      <span className="text-[9px] font-black uppercase tracking-widest">
+      <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">
         {isSyncing ? 'Saving...' : hasUnsavedChanges ? 'Unsaved' : 'Cloud OK'}
       </span>
     </button>
@@ -97,27 +94,27 @@ const Navbar: React.FC<NavbarProps> = ({
     <>
       <nav className="bg-malawi-black text-white p-3 md:p-4 shadow-lg sticky top-0 z-50 border-b-2 border-malawi-red">
         <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <Link to={isInactive ? "/activate" : "/dashboard"}><Logo size="sm" variant="light" showText={false} /></Link>
             <SyncIndicator />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <div className="hidden md:flex gap-1">
               <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={LayoutDashboard} label="Home" />
               <NavItem to="/withdraw" icon={Wallet} label="Wallet" />
               {currentUser.role === 'ADMIN' && <NavItem to="/admin" icon={ShieldCheck} label="Admin" badge={complaintsCount} />}
             </div>
-            <Link to="/profile?tab=account" className="w-8 h-8 rounded-full border border-malawi-green overflow-hidden">
-              {currentUser.profilePic ? <img src={currentUser.profilePic} className="w-full h-full object-cover" /> : <UserIcon size={16} className="m-auto mt-1.5 text-gray-400" />}
+            <Link to="/profile?tab=account" className="w-8 h-8 rounded-full border border-malawi-green overflow-hidden flex items-center justify-center bg-gray-800">
+              {currentUser.profilePic ? <img src={currentUser.profilePic} className="w-full h-full object-cover" /> : <UserIcon size={16} className="text-gray-400" />}
             </Link>
             <button onClick={onLogout} className="p-2 text-malawi-red hover:bg-malawi-red/10 rounded-lg"><LogOut size={20} /></button>
           </div>
         </div>
       </nav>
 
-      {/* Mobile Footer - Strictly Navigation only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-malawi-black border-t border-gray-800 flex justify-around items-center p-2 z-50 pb-safe">
+      {/* Mobile Footer */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-malawi-black border-t border-gray-800 flex justify-around items-center p-2 z-[60] pb-safe">
         <NavItem to={isInactive ? "/activate" : "/dashboard"} icon={LayoutDashboard} label="Home" />
         <NavItem to="/withdraw" icon={Wallet} label="Wallet" />
         <NavItem to="/history" icon={HistoryIcon} label="History" />
