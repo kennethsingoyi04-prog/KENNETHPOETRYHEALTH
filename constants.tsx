@@ -4,7 +4,7 @@ import { MembershipTier } from './types';
 export const MIN_WITHDRAWAL = 5000; // 5000 MWK
 export const LEVEL_1_COMMISSION_PERCENT = 10;
 export const LEVEL_2_COMMISSION_PERCENT = 5;
-export const SIGNUP_BONUS = 0; // No signup bonus - strictly work-based
+export const SIGNUP_BONUS = 0; 
 
 export const MALAWI_COLORS = {
   green: '#118131',
@@ -18,8 +18,8 @@ export interface MembershipConfig {
   price: number;
   color: string;
   description: string;
-  directCommission: number; // L1 % (Requested 30% - 40%)
-  indirectCommission: number; // L2 % (Requested flat 5%)
+  directCommission: number; // L1 % (30% - 40%)
+  indirectCommission: number; // L2 % (Fixed 5%)
 }
 
 export const MEMBERSHIP_TIERS: MembershipConfig[] = [
