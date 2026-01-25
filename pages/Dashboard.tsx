@@ -1,10 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppState, MembershipStatus, BookSellerStatus, User } from '../types';
+import { AppState, MembershipStatus, BookSellerStatus, User, WithdrawalStatus } from '../types';
 import { MEMBERSHIP_TIERS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
-// Added AlertCircle to imports
 import { 
   Users, 
   Copy, 
@@ -24,7 +23,14 @@ import {
   User as UserIcon,
   Search,
   Network,
-  AlertCircle
+  AlertCircle,
+  Bell,
+  MessageSquare,
+  Info,
+  Clock,
+  XCircle,
+  Calculator,
+  Target
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -59,6 +65,50 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
   const [isAskingAI, setIsAskingAI] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
 
+  // Projection logic
+  const [projectedInvites, setProjectedInvites] = useState(10);
+  const potentialProfit = (projectedInvites * (currentTier?.price || 2000) * (currentTier?.directCommission || 30)) / 100;
+
+  // Notifications logic
+  const notifications = useMemo(() => {
+    const list: { id: string, type: 'info' | 'success' | 'warning' | 'error', title: string, body: string, date: string, icon: any }[] = [];
+    
+    if (user.membershipNote) {
+      list.push({
+        id: 'activ-note',
+        type: user.membershipStatus === MembershipStatus.ACTIVE ? 'success' : 'warning',
+        title: 'Membership Update',
+        body: user.membershipNote,
+        date: user.createdAt,
+        icon: user.membershipStatus === MembershipStatus.ACTIVE ? CheckCircle : AlertCircle
+      });
+    }
+
+    state.complaints.filter(c => c.userId === user.id && c.reply).forEach(c => {
+      list.push({
+        id: c.id,
+        type: 'info',
+        title: `Support: ${c.subject}`,
+        body: `Admin: "${c.reply}"`,
+        date: c.updatedAt,
+        icon: MessageSquare
+      });
+    });
+
+    state.withdrawals.filter(w => w.userId === user.id && w.status !== WithdrawalStatus.PENDING).forEach(w => {
+      list.push({
+        id: w.id,
+        type: w.status === WithdrawalStatus.APPROVED ? 'success' : 'error',
+        title: `Payout ${w.status}`,
+        body: w.adminNote || (w.status === WithdrawalStatus.APPROVED ? 'Your payout was processed.' : 'Payout was rejected.'),
+        date: w.createdAt,
+        icon: w.status === WithdrawalStatus.APPROVED ? CheckCircle : XCircle
+      });
+    });
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [user, state.complaints, state.withdrawals]);
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
     alert('Referral link copied!');
@@ -68,15 +118,16 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
     e.preventDefault();
     if (!aiPrompt.trim()) return;
     setIsAskingAI(true);
+    setAiResponse(null);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Expert affiliate mentor for Malawi. Advice for: "${aiPrompt}". Short, actionable tactics.`,
+        contents: `You are an expert affiliate mentor for the 'KENNETHPOETRYHEALTH' platform in Malawi. Provide short, actionable recruitment advice for: "${aiPrompt}". Use encouraging language.`,
       });
       setAiResponse(response.text);
     } catch (err) {
-      setAiResponse("Network error. Try again.");
+      setAiResponse("Connectivity issue. Please try your request again.");
     } finally {
       setIsAskingAI(false);
     }
@@ -84,7 +135,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
 
   const showBookSellingCTA = !user.bookSellerStatus || user.bookSellerStatus === BookSellerStatus.NONE || user.bookSellerStatus === BookSellerStatus.REJECTED;
 
-  // Build Hierarchy Data
   const networkTree = useMemo(() => {
     const level1 = state.users.filter(u => u.referredBy === user.id);
     return level1.map(l1 => ({
@@ -124,6 +174,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         <div>
           <div className="flex items-center gap-3">
              <h1 className="text-2xl font-black text-malawi-black uppercase tracking-tight">Moni, {user.fullName}!</h1>
+             <div className="flex gap-1">
+                <div className="w-4 h-1 bg-black rounded-full"></div>
+                <div className="w-4 h-1 bg-malawi-red rounded-full"></div>
+                <div className="w-4 h-1 bg-malawi-green rounded-full"></div>
+             </div>
              {user.bookSellerStatus === BookSellerStatus.APPROVED && (
                 <span className="flex items-center gap-1 bg-malawi-red text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-md animate-pulse">
                   <BookOpen size={10} /> Verified Seller
@@ -144,10 +199,43 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
         </div>
       </header>
 
+      {/* Notifications Panel */}
+      {notifications.length > 0 && (
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+          <div className="bg-gray-50 px-8 py-4 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="text-malawi-red" size={16} />
+              <h3 className="text-xs font-black uppercase tracking-widest">System Messages</h3>
+            </div>
+            <span className="text-[8px] font-black bg-malawi-red text-white px-2 py-0.5 rounded-full uppercase">{notifications.length} New</span>
+          </div>
+          <div className="divide-y max-h-48 overflow-y-auto">
+            {notifications.map(n => (
+              <div key={n.id} className="p-4 hover:bg-gray-50 flex items-start gap-4 transition-colors">
+                <div className={`p-2 rounded-xl shrink-0 ${
+                  n.type === 'success' ? 'bg-green-100 text-green-600' :
+                  n.type === 'error' ? 'bg-red-100 text-red-600' :
+                  n.type === 'warning' ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'
+                }`}>
+                  <n.icon size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-tight text-malawi-black">{n.title}</p>
+                    <span className="text-[8px] font-bold text-gray-300 uppercase whitespace-nowrap">{new Date(n.date).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-[11px] font-medium text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Book Selling CTA */}
       {showBookSellingCTA && (
-        <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top-4 duration-500 ring-4 ring-malawi-red/10">
-          <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-malawi-red p-1 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top-4 duration-500 ring-4 ring-malawi-red/10 overflow-hidden relative">
+          <div className="bg-white p-8 rounded-[2.2rem] flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
             <div className="flex items-center gap-6">
               <div className="bg-malawi-red/10 p-5 rounded-3xl text-malawi-red shrink-0">
                 <BookOpen size={40} />
@@ -161,21 +249,13 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
               onClick={() => navigate('/profile?tab=bookselling')}
               className="w-full md:w-auto px-10 py-5 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-red-800"
             >
-              Get Started <ArrowRight size={18} />
+              Join Now <ArrowRight size={18} />
             </button>
           </div>
+          <BookOpen className="absolute -right-10 -bottom-10 w-48 h-48 text-malawi-red/5 -rotate-12" />
         </div>
       )}
 
-      {/* Status Notifications */}
-      {user.membershipNote && user.membershipStatus === MembershipStatus.INACTIVE && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl flex items-center gap-3">
-          <AlertCircle className="text-yellow-400" />
-          <p className="text-xs font-bold text-yellow-700 uppercase">Membership Note: {user.membershipNote}</p>
-        </div>
-      )}
-
-      {/* Categories Earnings Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-malawi-green transition-all relative overflow-hidden">
           <div className="flex items-center gap-4 relative z-10">
@@ -195,7 +275,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
           <div className="flex items-center gap-4 relative z-10">
             <div className="p-3 bg-malawi-red/10 text-malawi-red rounded-2xl group-hover:bg-malawi-red group-hover:text-white transition-all"><Users size={24}/></div>
             <div>
-              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">INDIRECT INVITES BONUS EARNINGS</p>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">INDIRECT INVITES BONUS</p>
               <div className="flex items-baseline gap-2">
                 <p className="text-2xl font-black text-malawi-red">K{indirectInvitesTotal.toLocaleString()}</p>
                 <p className="text-[10px] font-black text-gray-400 uppercase">(5% Attached)</p>
@@ -213,15 +293,16 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
               <p className="text-[10px] font-black uppercase text-gray-400">Total Profits Paid</p>
               <p className="text-xl font-black text-malawi-green">K{user.totalEarnings.toLocaleString()}</p>
             </div>
-            <div className="bg-white p-6 rounded-3xl border shadow-sm text-center">
+            <div className="bg-white p-6 rounded-3xl border shadow-sm text-center group cursor-help">
               <p className="text-[10px] font-black uppercase text-gray-400">Network Size</p>
-              <p className="text-xl font-black">{state.users.filter(u => u.referredBy === user.id).length} Active</p>
+              <p className="text-xl font-black group-hover:text-malawi-red transition-colors">{state.users.filter(u => u.referredBy === user.id).length} Active Members</p>
             </div>
           </div>
 
           <div className="bg-malawi-green p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
             <div className="relative z-10 space-y-4">
               <h2 className="text-2xl font-black uppercase tracking-tight">Recruitment Link</h2>
+              <p className="text-[10px] font-bold uppercase text-white/60">Invite others and earn up to {currentTier?.directCommission}% instant commission.</p>
               <div className="flex gap-2">
                 <div className="bg-black/20 p-4 rounded-2xl flex-grow font-mono text-xs truncate border border-white/10">{referralLink}</div>
                 <button onClick={copyToClipboard} className="bg-white text-malawi-green p-4 rounded-2xl shadow-lg active:scale-95 transition-transform"><Copy size={20}/></button>
@@ -230,20 +311,66 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
             <Award className="absolute top-[-20%] right-[-5%] text-white/10 w-48 h-48 -rotate-12" />
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Sparkles size={16} className="text-malawi-red"/> Growth Assistant</h3>
-            {aiResponse && <div className="p-5 bg-gray-50 rounded-2xl text-xs font-medium border italic leading-relaxed animate-in slide-in-from-top-2">"{aiResponse}"</div>}
-            <form onSubmit={askMarketingAssistant} className="flex gap-2">
-              <input value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder="Ask AI for recruiting tips..." className="flex-grow bg-gray-50 p-4 rounded-2xl border outline-none text-sm"/>
-              <button disabled={isAskingAI} className="bg-malawi-black text-white p-4 rounded-2xl active:scale-95 transition-transform">{isAskingAI ? <Loader2 className="animate-spin"/> : <Send size={20}/>}</button>
-            </form>
+          {/* Earnings Projection Calculator */}
+          <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-6">
+             <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Calculator size={16} className="text-malawi-green"/> Profit Projection</h3>
+             <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                   <p className="text-[10px] font-black text-gray-400 uppercase">Target Invites this Month</p>
+                   <span className="text-xl font-black">{projectedInvites} Members</span>
+                </div>
+                <input 
+                   type="range" 
+                   min="1" 
+                   max="100" 
+                   value={projectedInvites} 
+                   onChange={(e) => setProjectedInvites(parseInt(e.target.value))}
+                   className="w-full accent-malawi-green"
+                />
+                <div className="p-6 bg-gray-50 rounded-2xl border flex items-center justify-between">
+                   <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase">Potential Earnings</p>
+                      <p className="text-2xl font-black text-malawi-green">K{potentialProfit.toLocaleString()}</p>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-[9px] font-black text-gray-400 uppercase">Tier Bonus</p>
+                      <p className="text-xs font-bold text-malawi-black">{currentTier?.directCommission}% Multiplier</p>
+                   </div>
+                </div>
+             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-[2.5rem] border shadow-sm h-full flex flex-col overflow-hidden max-h-[700px]">
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-[2.5rem] border shadow-sm p-8 space-y-4">
+            <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Sparkles size={16} className="text-malawi-red"/> Mentor Assistant</h3>
+            <div className="min-h-[100px] flex flex-col">
+              {aiResponse ? (
+                <div className="p-5 bg-gray-50 rounded-2xl text-[11px] font-medium border italic leading-relaxed animate-in slide-in-from-top-2 flex-grow">
+                  "{aiResponse}"
+                </div>
+              ) : (
+                <div className="flex-grow flex items-center justify-center p-5 border border-dashed rounded-2xl text-[9px] font-black uppercase text-gray-300">
+                  Ask AI for professional recruitment strategies
+                </div>
+              )}
+            </div>
+            <form onSubmit={askMarketingAssistant} className="flex gap-2">
+              <input 
+                value={aiPrompt} 
+                onChange={e => setAiPrompt(e.target.value)} 
+                placeholder="How to grow my network fast?" 
+                className="flex-grow bg-gray-50 p-4 rounded-2xl border outline-none text-xs font-bold"
+              />
+              <button disabled={isAskingAI} className="bg-malawi-black text-white p-4 rounded-2xl active:scale-95 transition-transform shrink-0">
+                {isAskingAI ? <Loader2 className="animate-spin" size={18}/> : <Send size={18}/>}
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border shadow-sm h-full flex flex-col overflow-hidden max-h-[500px]">
             <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
-               <h3 className="font-black text-xs uppercase tracking-widest">Network Visualization</h3>
+               <h3 className="font-black text-xs uppercase tracking-widest">Network View</h3>
                <div className="flex bg-gray-200 p-1 rounded-xl">
                  <button onClick={() => setViewMode('map')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'map' ? 'bg-white text-malawi-black shadow-sm' : 'text-gray-400'}`}><Network size={14} /></button>
                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-malawi-black shadow-sm' : 'text-gray-400'}`}><TrendingDown size={14} /></button>
@@ -254,34 +381,16 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
               {viewMode === 'map' ? (
                 <div className="min-w-fit flex flex-col items-center">
                   <NetworkNode targetUser={user} level={0} isRoot />
-                  
                   {networkTree.length === 0 ? (
                     <div className="mt-8 text-center text-gray-300 italic text-[10px] uppercase font-black max-w-[150px]">
-                      Your network is empty. Recruit others to see your tree grow!
+                      Team is empty. Start recruiting to earn!
                     </div>
                   ) : (
                     <div className="mt-4 flex gap-8 items-start relative">
-                      {/* Level 1 Container */}
-                      {networkTree.map((l1Node, idx) => (
+                      {networkTree.map((l1Node) => (
                         <div key={l1Node.id} className="flex flex-col items-center relative">
-                          {/* Connecting Line to Root */}
                           <div className="absolute -top-4 w-px h-4 bg-gray-200"></div>
-                          
                           <NetworkNode targetUser={l1Node} level={1} />
-                          
-                          {/* Level 2 Container */}
-                          {l1Node.children.length > 0 && (
-                            <div className="mt-6 flex gap-4 border-t pt-4 border-gray-100">
-                              {l1Node.children.slice(0, 3).map(l2 => (
-                                <NetworkNode key={l2.id} targetUser={l2} level={2} />
-                              ))}
-                              {l1Node.children.length > 3 && (
-                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[8px] font-black text-gray-400">
-                                  +{l1Node.children.length - 3}
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -290,7 +399,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
               ) : (
                 <div className="divide-y -mx-6">
                   {myReferrals.length === 0 ? (
-                    <div className="p-12 text-center text-gray-300 italic text-xs uppercase font-black">No team members yet</div>
+                    <div className="p-12 text-center text-gray-300 italic text-xs uppercase font-black">No activity found</div>
                   ) : (
                     myReferrals.map(ref => {
                       const target = state.users.find(u => u.id === ref.referredId);
@@ -300,11 +409,9 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onStateUpdate }) => {
                               <div className="w-10 h-10 bg-malawi-black rounded-xl flex items-center justify-center text-white font-black uppercase group-hover:bg-malawi-green transition-colors">{target?.fullName.charAt(0)}</div>
                               <div className="flex-grow">
                                  <p className="text-xs font-black uppercase tracking-tight">{target?.fullName}</p>
-                                 <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${target?.membershipStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                      {target?.membershipTier} {target?.membershipStatus === 'PENDING' ? '(WAITING)' : ''}
-                                    </span>
-                                 </div>
+                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${target?.membershipStatus === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                   {target?.membershipTier}
+                                 </span>
                               </div>
                               <div className="text-right">
                                  <p className="text-[10px] font-black text-malawi-green">+K{ref.commission.toLocaleString()}</p>

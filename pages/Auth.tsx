@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AppState, User, MembershipTier, MembershipStatus } from '../types';
 import Logo from '../components/Logo';
-import { Lock, User as UserIcon, ChevronRight, AtSign, ArrowLeft, Loader2, AlertCircle, ShieldCheck, Key, Smartphone, Mail, Zap } from 'lucide-react';
+import { Lock, User as UserIcon, ChevronRight, AtSign, ArrowLeft, Loader2, AlertCircle, ShieldCheck, Key, Smartphone, Mail, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import { notifyNewRegistration } from '../services/NotificationService';
 
 interface AuthProps {
@@ -36,6 +36,21 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     setError(null);
   }, [typeParam]);
 
+  // Password Strength Logic
+  const passwordStrength = useMemo(() => {
+    const p = formData.password;
+    if (!p) return 0;
+    let score = 0;
+    if (p.length > 6) score++;
+    if (p.length > 10) score++;
+    if (/[A-Z]/.test(p) && /[a-z]/.test(p)) score++;
+    if (/[0-9]/.test(p) || /[^A-Za-z0-9]/.test(p)) score++;
+    return score; // 0-4
+  }, [formData.password]);
+
+  const strengthColor = ['bg-gray-200', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'][passwordStrength];
+  const strengthText = ['', 'Weak', 'Fair', 'Good', 'Strong'][passwordStrength];
+
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -44,6 +59,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     const SYSTEM_MASTER_KEY = 'KPH-OWNER-2025';
     const identifier = (formData.username || formData.email || '').toLowerCase().trim();
 
+    // Admin shortcut check
     const isOwnerIdentifier = ['admin', 'owner', 'kenneth'].includes(identifier);
     const existingAdmin = state.users.find(u => u.role === 'ADMIN' && (u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier));
 
@@ -87,28 +103,52 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
     setTimeout(() => {
       if (isLogin) {
         if (!identifier) {
-          setError('Please enter your username or email.');
+          setError('Please enter your username or email address.');
           setIsLoading(false);
           return;
         }
         const success = onLogin(identifier, formData.password);
         if (!success) {
-          setError('Access Denied. Owners: Use your Username and Master Key.');
+          const userExists = state.users.some(u => u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier);
+          if (!userExists) {
+            setError(`The account "${identifier}" was not found. Please check the spelling or join now.`);
+          } else {
+            setError('The password you entered is incorrect. Please try again or contact support if you forgot it.');
+          }
           setIsLoading(false);
         } else {
           const loggedInUser = state.users.find(u => u.username.toLowerCase() === identifier || u.email.toLowerCase() === identifier);
           navigate(loggedInUser?.role === 'ADMIN' ? '/admin' : '/dashboard');
         }
       } else {
+        // Signup Flow
         if (adminMode && formData.masterKey !== SYSTEM_MASTER_KEY) {
-          setError('Invalid Master Authorization Key.');
+          setError('Invalid Master Authorization Key. Admin accounts require verified system credentials.');
           setIsLoading(false);
           return;
         }
 
+        // 1. Username Taken Check
         const isUsernameTaken = state.users.some(u => u.username.toLowerCase() === identifier);
         if (isUsernameTaken) {
-          setError('Username is already taken.');
+          setError(`The username "@${identifier}" is already registered. Please try another unique username.`);
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Referral Code Check
+        if (formData.referralCode && !adminMode) {
+          const referrer = state.users.find(u => u.referralCode.toUpperCase() === formData.referralCode.toUpperCase());
+          if (!referrer) {
+            setError(`The referral code "${formData.referralCode}" is invalid. Please double-check it or leave it blank.`);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // 3. Password Strength Requirement
+        if (formData.password.length < 6) {
+          setError('Your password is too short. Please use at least 6 characters for better security.');
           setIsLoading(false);
           return;
         }
@@ -121,7 +161,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
   const finishRegistration = (masterKey: string) => {
     const userId = `u-${Date.now()}`;
     const newUserReferralCode = formData.username.toUpperCase() + Math.floor(Math.random() * 100);
-    const referrer = state.users.find(u => u.referralCode === formData.referralCode);
+    const referrer = state.users.find(u => u.referralCode.toUpperCase() === formData.referralCode.toUpperCase());
     
     const newUser: User = {
       id: userId,
@@ -181,7 +221,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-700 animate-in shake duration-300">
-            <AlertCircle className="shrink-0 mt-0.5" size={18} />
+            <XCircle className="shrink-0 mt-0.5" size={18} />
             <p className="text-xs font-bold leading-relaxed">{error}</p>
           </div>
         )}
@@ -211,6 +251,21 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
               <input type="password" required placeholder="••••••••" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
+            
+            {!isLogin && formData.password && (
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">Security: <span className={passwordStrength > 2 ? 'text-malawi-green' : 'text-malawi-red'}>{strengthText}</span></span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-gray-300">{formData.password.length} chars</span>
+                </div>
+                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-500 ${strengthColor}`} 
+                    style={{ width: `${(passwordStrength / 4) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {!isLogin && (
@@ -225,7 +280,10 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
               {!adminMode && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referral Code (Optional)</label>
-                  <input type="text" placeholder="REF-CODE" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green" value={formData.referralCode} onChange={e => setFormData({...formData, referralCode: e.target.value})} />
+                  <div className="relative">
+                    <ChevronRight className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input type="text" placeholder="REF-CODE" className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-malawi-green transition-all uppercase" value={formData.referralCode} onChange={e => setFormData({...formData, referralCode: e.target.value})} />
+                  </div>
                 </div>
               )}
             </>
@@ -242,7 +300,7 @@ const Auth: React.FC<AuthProps> = ({ state, onLogin, onStateUpdate }) => {
           )}
 
           <button type="submit" disabled={isLoading} className="w-full py-5 bg-malawi-black text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-[11px] uppercase tracking-widest disabled:opacity-70 mt-4">
-            {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Log In' : 'Join')}
+            {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Log In' : 'Join Network')}
           </button>
         </form>
 

@@ -6,7 +6,7 @@ import Logo from '../components/Logo';
 import { syncAppStateToCloud, uploadImage } from '../dataService';
 import { 
   ShieldCheck, RefreshCw, Search, 
-  X, Wallet, Users, Zap, Loader2, Monitor, MessageSquare, Check, CheckCircle2, Gavel, ShieldAlert, ImageIcon, Eye, BookOpen, UserCheck, UserX, MapPin, Smartphone, Clock, Calendar, Ban, UserCog, Award, Circle, ExternalLink, MessageCircle
+  X, Wallet, Users, Zap, Loader2, Monitor, MessageSquare, Check, CheckCircle2, Gavel, ShieldAlert, ImageIcon, Eye, BookOpen, UserCheck, UserX, MapPin, Smartphone, Clock, Calendar, Ban, UserCog, Award, Circle, ExternalLink, MessageCircle, Network, ArrowUpRight
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -33,6 +33,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
   // Membership rejection state
   const [rejectingActivation, setRejectingActivation] = useState<User | null>(null);
   const [rejectionNote, setRejectionNote] = useState("");
+
+  // Book Seller rejection state
+  const [rejectingDistributor, setRejectingDistributor] = useState<User | null>(null);
+  const [distributorRejectionNote, setDistributorRejectionNote] = useState("");
 
   const [banReason, setBanReason] = useState("");
   const [banType, setBanType] = useState<'PERMANENT' | 'TEMPORARY'>('TEMPORARY');
@@ -156,9 +160,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     alert("Membership Activation Rejected. User has been notified.");
   };
 
-  const handleBookSellerAction = (userId: string, status: BookSellerStatus) => {
-    const updatedUsers = state.users.map(u => u.id === userId ? { ...u, bookSellerStatus: status } : u);
+  const handleBookSellerAction = (userId: string, status: BookSellerStatus, note?: string) => {
+    const updatedUsers = state.users.map(u => u.id === userId ? { 
+      ...u, 
+      bookSellerStatus: status,
+      membershipNote: status === BookSellerStatus.REJECTED ? (note || "Distributor application rejected.") : "Distributor application approved."
+    } : u);
     onStateUpdate({ users: updatedUsers });
+    if (status === BookSellerStatus.REJECTED) {
+      setRejectingDistributor(null);
+      setDistributorRejectionNote("");
+    }
     alert(`Book Distributor Request ${status === BookSellerStatus.APPROVED ? 'Approved' : 'Rejected'}. User notified.`);
   };
 
@@ -217,6 +229,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
     return (new Date().getTime() - new Date(user.lastLoginAt).getTime()) < 5 * 60 * 1000;
   };
 
+  // Logic for viewing PAID referrals of a member
+  const inspectingUserPaidReferrals = useMemo(() => {
+    if (!inspectingUser) return [];
+    return state.referrals
+      .filter(ref => ref.referrerId === inspectingUser.id)
+      .map(ref => {
+        const referredUser = state.users.find(u => u.id === ref.referredId);
+        return {
+          ...ref,
+          user: referredUser
+        };
+      })
+      .filter(item => item.user && item.user.membershipStatus === MembershipStatus.ACTIVE);
+  }, [inspectingUser, state.referrals, state.users]);
+
   return (
     <div className="max-w-7xl mx-auto pb-32 animate-in fade-in duration-700">
       {/* Overlays */}
@@ -263,6 +290,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
         </div>
       )}
 
+      {/* Distributor Reject Modal */}
+      {rejectingDistributor && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
+           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
+              <div className="bg-malawi-red p-8 text-white flex justify-between items-center">
+                 <h2 className="text-xl font-black uppercase tracking-tight">Reject Distributor</h2>
+                 <button onClick={() => setRejectingDistributor(null)} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
+              </div>
+              <div className="p-8 space-y-6">
+                 <p className="text-xs font-bold text-gray-500 uppercase">Reason for Distributor Rejection:</p>
+                 <textarea required rows={3} className="w-full p-4 bg-gray-50 border rounded-2xl text-sm font-medium" placeholder="e.g. Invalid marketing address..." value={distributorRejectionNote} onChange={e => setDistributorRejectionNote(e.target.value)} />
+                 <button onClick={() => handleBookSellerAction(rejectingDistributor.id, BookSellerStatus.REJECTED, distributorRejectionNote)} className="w-full py-4 bg-malawi-red text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Reject Application</button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {processingPayout && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-malawi-black/90 backdrop-blur-md">
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden">
@@ -302,8 +346,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
 
       {inspectingUser && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-malawi-black/95 backdrop-blur-xl">
-           <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-              <div className={`p-10 text-white flex items-center justify-between ${inspectingUser.isBanned ? 'bg-malawi-red' : 'bg-malawi-black'}`}>
+           <div className="bg-white w-full max-w-5xl rounded-[4rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+              <div className={`p-10 text-white flex items-center justify-between shrink-0 ${inspectingUser.isBanned ? 'bg-malawi-red' : 'bg-malawi-black'}`}>
                  <div className="flex items-center gap-6">
                     <div className="relative">
                       <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-2xl border border-white/20">
@@ -319,8 +363,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                  <button onClick={() => setInspectingUser(null)} className="p-4 hover:bg-white/10 rounded-full"><X size={32}/></button>
               </div>
               
-              <div className="p-10 overflow-y-auto space-y-8">
-                 <div className="grid grid-cols-3 gap-6">
+              <div className="p-10 overflow-y-auto space-y-10 flex-grow scrollbar-hide">
+                 {/* Summary Stats */}
+                 <div className="grid grid-cols-4 gap-6">
                     <div className="bg-gray-50 p-6 rounded-[2rem] border">
                        <p className="text-[10px] font-black uppercase text-gray-400">Current Balance</p>
                        <p className="text-2xl font-black text-malawi-green">K{inspectingUser.balance.toLocaleString()}</p>
@@ -330,13 +375,89 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                        <p className="text-2xl font-black">K{inspectingUser.totalEarnings.toLocaleString()}</p>
                     </div>
                     <div className="bg-gray-50 p-6 rounded-[2rem] border">
+                       <p className="text-[10px] font-black uppercase text-gray-400">Paid Referrals</p>
+                       <p className="text-2xl font-black">{inspectingUserPaidReferrals.length}</p>
+                    </div>
+                    <div className="bg-gray-50 p-6 rounded-[2rem] border">
                        <p className="text-[10px] font-black uppercase text-gray-400">Sponsor</p>
                        <p className="text-sm font-black uppercase">{state.users.find(u => u.id === inspectingUser.referredBy)?.username || 'System'}</p>
                     </div>
                  </div>
 
+                 {/* NEW: Paid Referral Network Section */}
                  <div className="bg-white rounded-[3rem] border p-8 space-y-6">
-                    <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><Smartphone className="text-malawi-green" size={20}/> Contact Information</h3>
+                    <div className="flex items-center justify-between">
+                       <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                          <Network className="text-malawi-green" size={24}/> 
+                          Paid Referral Network
+                       </h3>
+                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Only displaying Active Memberships</p>
+                    </div>
+                    
+                    <div className="overflow-x-auto border rounded-3xl">
+                       <table className="w-full text-left">
+                          <thead className="bg-gray-50 text-[9px] font-black uppercase text-gray-400 border-b">
+                             <tr>
+                                <th className="px-6 py-4">Referred Member</th>
+                                <th className="px-6 py-4">Membership</th>
+                                <th className="px-6 py-4">Network Level</th>
+                                <th className="px-6 py-4 text-right">Commission Earned</th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                             {inspectingUserPaidReferrals.length === 0 ? (
+                                <tr>
+                                   <td colSpan={4} className="p-10 text-center text-gray-300 italic uppercase font-black text-xs">No verified paid referrals found</td>
+                                </tr>
+                             ) : (
+                                inspectingUserPaidReferrals.map(item => (
+                                   <tr key={item.id} className="hover:bg-gray-50/50">
+                                      <td className="px-6 py-4">
+                                         <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-malawi-black text-white flex items-center justify-center font-black text-xs">
+                                               {item.user?.fullName.charAt(0)}
+                                            </div>
+                                            <div>
+                                               <p className="text-xs font-black uppercase">{item.user?.fullName}</p>
+                                               <p className="text-[8px] text-gray-400">@{item.user?.username}</p>
+                                            </div>
+                                         </div>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                         <span className="px-2 py-1 bg-gray-100 rounded text-[8px] font-black uppercase" style={{ color: MEMBERSHIP_TIERS.find(t => t.tier === item.user?.membershipTier)?.color }}>
+                                            {item.user?.membershipTier}
+                                         </span>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                         <p className={`text-[10px] font-black uppercase ${item.level === 1 ? 'text-malawi-green' : 'text-malawi-red'}`}>
+                                            Level {item.level} {item.level === 1 ? '(Direct)' : '(Bonus)'}
+                                         </p>
+                                      </td>
+                                      <td className="px-6 py-4 text-right font-black text-malawi-green text-sm">
+                                         K{item.commission.toLocaleString()}
+                                      </td>
+                                   </tr>
+                                ))
+                             )}
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
+
+                 {/* Book Distributor Profile Section */}
+                 {inspectingUser.bookSellerStatus === BookSellerStatus.APPROVED && (
+                    <div className="bg-red-50/30 rounded-[3rem] border border-malawi-red/10 p-8 space-y-6">
+                       <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><BookOpen className="text-malawi-red" size={20}/> Verified Book Distributor Profile</h3>
+                       <div className="grid grid-cols-2 gap-8">
+                          <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">Distribution Contact</p><p className="font-bold">{inspectingUser.bookSellerWhatsapp || inspectingUser.whatsapp || 'N/A'}</p></div>
+                          <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">Home Address</p><p className="font-bold">{inspectingUser.bookSellerAddress || 'N/A'}</p></div>
+                       </div>
+                    </div>
+                 )}
+
+                 {/* Contact Information */}
+                 <div className="bg-white rounded-[3rem] border p-8 space-y-6">
+                    <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><Smartphone className="text-malawi-green" size={20}/> Basic Contact Information</h3>
                     <div className="grid grid-cols-2 gap-8">
                        <div><p className="text-[10px] font-black uppercase text-gray-400 mb-1">Phone</p><p className="font-bold">{inspectingUser.phone || 'N/A'}</p></div>
                        <div className="flex items-center justify-between">
@@ -346,6 +467,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                     </div>
                  </div>
 
+                 {/* Roles & Bans */}
                  <div className="bg-white rounded-[3rem] border p-8 space-y-6">
                     <h3 className="text-lg font-black uppercase tracking-tight flex items-center gap-2"><Gavel className="text-malawi-red" size={20}/> Discipline & Roles</h3>
                     <div className="flex items-center justify-between">
@@ -502,12 +624,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onStateUpdate })
                           </div>
                           <div className="flex items-center gap-3">
                              <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.APPROVED)} className="px-6 py-4 bg-malawi-green text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95"><UserCheck size={16}/> Approve</button>
-                             <button onClick={() => handleBookSellerAction(u.id, BookSellerStatus.REJECTED)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95"><UserX size={16}/> Reject</button>
+                             <button onClick={() => setRejectingDistributor(u)} className="px-6 py-4 bg-malawi-red text-white rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95"><UserX size={16}/> Reject</button>
                           </div>
                        </div>
                        <div className="bg-gray-50 p-6 rounded-3xl grid grid-cols-2 gap-4 border border-gray-100 ml-20 mr-10">
                           <div className="flex items-center gap-3"><Smartphone className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Contact</p><p className="text-xs font-bold">{u.bookSellerWhatsapp || u.whatsapp}</p></div></div>
-                          <div className="flex items-center gap-3"><MapPin className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Mailing Address</p><p className="text-xs font-bold">{u.bookSellerAddress}</p></div></div>
+                          <div className="flex items-center gap-3"><MapPin className="text-malawi-red" size={16}/><div><p className="text-[9px] font-black uppercase text-gray-400">Home Address</p><p className="text-xs font-bold">{u.bookSellerAddress}</p></div></div>
                        </div>
                     </div>
                  ))

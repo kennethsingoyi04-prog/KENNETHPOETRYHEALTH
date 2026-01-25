@@ -205,7 +205,7 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
               <div className="space-y-8 animate-in fade-in duration-300">
                 <div className="border-b pb-6">
                    <h3 className="text-xl font-black uppercase tracking-tight">Book Distributor Program</h3>
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Earn extra commissions by advertising our literature.</p>
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Register your details to start advertising our books and earn commission.</p>
                 </div>
 
                 {user.bookSellerStatus === BookSellerStatus.APPROVED ? (
@@ -224,21 +224,21 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                   <form onSubmit={handleBookDistributorRequest} className="space-y-6">
                     <div className="p-6 bg-malawi-red/5 rounded-3xl border border-malawi-red/10 flex items-start gap-4">
                        <AlertCircle className="text-malawi-red shrink-0" size={24}/>
-                       <p className="text-xs font-bold text-gray-600 leading-relaxed uppercase">Apply to become a verified distributor. Advertise books to your network and earn commissions on every unit sold!</p>
+                       <p className="text-xs font-bold text-gray-600 leading-relaxed uppercase italic">"Register your details to start advertising our books and earn commission."</p>
                     </div>
 
                     <div className="space-y-4">
                       <div className="space-y-1">
-                         <label className="text-[10px] font-black uppercase text-gray-400">Distributor Name</label>
-                         <input type="text" required className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none" value={bookSellerFullName} onChange={e => setBookSellerFullName(e.target.value)} placeholder="Name as per ID"/>
+                         <label className="text-[10px] font-black uppercase text-gray-400">Full Name</label>
+                         <input type="text" required className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none" value={bookSellerFullName} onChange={e => setBookSellerFullName(e.target.value)} placeholder="Full Name"/>
                       </div>
                       <div className="space-y-1">
                          <label className="text-[10px] font-black uppercase text-gray-400">WhatsApp for Marketing</label>
                          <input type="tel" required className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none" value={bookWhatsapp} onChange={e => setBookWhatsapp(e.target.value)} placeholder="088/099xxxxxxx"/>
                       </div>
                       <div className="space-y-1">
-                         <label className="text-[10px] font-black uppercase text-gray-400">Shipping/Contact Address</label>
-                         <textarea required rows={3} className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none resize-none" value={bookAddress} onChange={e => setBookAddress(e.target.value)} placeholder="Where can customers or courier reach you?"/>
+                         <label className="text-[10px] font-black uppercase text-gray-400">Home Address</label>
+                         <textarea required rows={3} className="w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none resize-none" value={bookAddress} onChange={e => setBookAddress(e.target.value)} placeholder="Enter your home address"/>
                       </div>
                     </div>
 
@@ -266,9 +266,17 @@ const Profile: React.FC<ProfileProps> = ({ state, onStateUpdate }) => {
                 ) : (
                   <div className="space-y-3">
                     {myComplaints.length === 0 ? <div className="py-20 text-center text-gray-300 italic uppercase font-black">No tickets yet</div> : myComplaints.map(ticket => (
-                      <div key={ticket.id} className="w-full bg-white rounded-3xl p-6 border border-gray-100 flex justify-between items-center shadow-sm">
-                        <div className="text-left"><h5 className="font-black text-sm uppercase text-malawi-black mb-1">{ticket.subject}</h5><p className="text-[9px] text-gray-400 font-bold uppercase">{ticket.id}</p></div>
-                        <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase ${ticket.status === 'PENDING' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}>{ticket.status}</span>
+                      <div key={ticket.id} className="w-full bg-white rounded-3xl p-6 border border-gray-100 flex flex-col gap-4 shadow-sm">
+                        <div className="flex justify-between items-center">
+                          <div className="text-left"><h5 className="font-black text-sm uppercase text-malawi-black mb-1">{ticket.subject}</h5><p className="text-[9px] text-gray-400 font-bold uppercase">{ticket.id}</p></div>
+                          <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase ${ticket.status === 'PENDING' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}>{ticket.status}</span>
+                        </div>
+                        {ticket.reply && (
+                          <div className="p-4 bg-malawi-black text-white rounded-2xl text-[11px] font-medium border-l-4 border-malawi-red">
+                            <p className="text-[8px] font-black uppercase text-malawi-red mb-1 tracking-widest">Admin Reply</p>
+                            "{ticket.reply}"
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
